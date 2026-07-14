@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useAuth } from './AuthContext'
 import Login from './Login'
 import ContactForm from './ContactForm'
+import ContactList from './ContactList'
 import './App.css'
 
 function App() {
@@ -23,41 +24,12 @@ function App() {
 }
 
 function Dashboard({ session, signOut }) {
-  const [contacts, setContacts] = useState([])
   const [view, setView] = useState('list') // 'list' | 'add' | { edit: contactId }
-  const [contactsError, setContactsError] = useState(null)
-
-  const apiUrl = import.meta.env.VITE_API_URL
-  const authHeaders = { Authorization: `Bearer ${session.access_token}` }
-
-  const loadContacts = () => {
-    fetch(`${apiUrl}/api/contacts`, { headers: authHeaders })
-      .then((res) => res.json())
-      .then((data) => (Array.isArray(data) ? setContacts(data) : setContactsError(data.error)))
-      .catch((err) => setContactsError(err.message))
-  }
-
-  useEffect(() => {
-    loadContacts()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const [listKey, setListKey] = useState(0)
 
   const handleSaved = () => {
     setView('list')
-    loadContacts()
-  }
-
-  if (view === 'add' || (view && view.edit)) {
-    return (
-      <section id="center">
-        <ContactForm
-          session={session}
-          contactId={view.edit}
-          onSaved={handleSaved}
-          onCancel={() => setView('list')}
-        />
-      </section>
-    )
+    setListKey((k) => k + 1)
   }
 
   return (
@@ -68,22 +40,21 @@ function Dashboard({ session, signOut }) {
         Sign out
       </button>
 
-      <h2>Contacts</h2>
-      <button type="button" onClick={() => setView('add')}>
-        + Add Contact
-      </button>
-
-      {contactsError && <p style={{ color: 'red' }}>{contactsError}</p>}
-
-      <ul>
-        {contacts.map((c) => (
-          <li key={c.id}>
-            <button type="button" onClick={() => setView({ edit: c.id })}>
-              {c.name} — {c.type} — {c.phone}
-            </button>
-          </li>
-        ))}
-      </ul>
+      {view === 'add' || (view && view.edit) ? (
+        <ContactForm
+          session={session}
+          contactId={view.edit}
+          onSaved={handleSaved}
+          onCancel={() => setView('list')}
+        />
+      ) : (
+        <ContactList
+          key={listKey}
+          session={session}
+          onAdd={() => setView('add')}
+          onSelect={(id) => setView({ edit: id })}
+        />
+      )}
     </section>
   )
 }

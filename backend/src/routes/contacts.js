@@ -7,15 +7,71 @@ const router = express.Router();
 
 router.use(requireAuth);
 
+// PostgREST embeds a to-one relation as an object when the FK column is
+// unique (as buyer_details.contact_id / seller_details.contact_id are), but
+// normalize defensively in case it ever comes back as a single-item array.
+function pickOne(relation) {
+  if (!relation) return null;
+  return Array.isArray(relation) ? relation[0] || null : relation;
+}
+
 router.get('/', async (req, res) => {
   const db = getUserClient(req.userToken);
   const { data, error } = await db
     .from('contacts')
-    .select('id, name, phone, type, notes, last_interaction_date, created_at')
+    .select('id, name, phone, type, notes, last_interaction_date, created_at, buyer_details(*), seller_details(*)')
     .order('created_at', { ascending: false });
 
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+
+  const { q, type, property_type, area_of_interest } = req.query;
+  let results = data;
+
+  if (q) {
+    const needle = q.toLowerCase();
+    results = results.filter(
+      (c) => c.name.toLowerCase().includes(needle) || c.phone.toLowerCase().includes(needle),
+    );
+  }
+
+  if (type) {
+    results = results.filter((c) => c.type === type);
+  }
+
+  if (property_type) {
+    results = results.filter((c) => {
+      const buyer = pickOne(c.buyer_details);
+      const seller = pickOne(c.seller_details);
+      const pt = buyer?.property_type_wanted || seller?.property_type;
+      return pt === property_type;
+    });
+  }
+
+  if (area_of_interest) {
+    const needle = area_of_interest.toLowerCase();
+    results = results.filter((c) => {
+      const buyer = pickOne(c.buyer_details);
+      return (buyer?.area_of_interest || '').toLowerCase().includes(needle);
+    });
+  }
+
+  const shaped = results.map((c) => {
+    const buyer = pickOne(c.buyer_details);
+    const seller = pickOne(c.seller_details);
+    return {
+      id: c.id,
+      name: c.name,
+      phone: c.phone,
+      type: c.type,
+      notes: c.notes,
+      last_interaction_date: c.last_interaction_date,
+      created_at: c.created_at,
+      property_type: buyer?.property_type_wanted || seller?.property_type || null,
+      area_of_interest: buyer?.area_of_interest || null,
+    };
+  });
+
+  res.json(shaped);
 });
 
 router.get('/:id', async (req, res) => {
