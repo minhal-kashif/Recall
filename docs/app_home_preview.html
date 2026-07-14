@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home Screen Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#12181c;
+    --panel:#1b2329;
+    --panel-2:#212b32;
+    --paper:#ede6d6;
+    --paper-dim:#b9b2a2;
+    --brass:#c89b3c;
+    --brass-dim:#9c7a2f;
+    --teal:#3a9c81;
+    --terracotta:#c1502e;
+    --muted:#7c8a90;
+    --line:#33403a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--ink);
+    color:var(--paper);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:1180px;
+    margin:0 auto;
+    padding:56px 28px 72px;
+  }
+  header{
+    text-align:center;
+    margin-bottom:52px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--brass);
+    margin-bottom:14px;
+  }
+  h1{
+    font-family:'Fraunces',serif;
+    font-weight:500;
+    font-size:clamp(32px,5vw,52px);
+    line-height:1.08;
+    margin:0 0 16px;
+    color:var(--paper);
+  }
+  h1 em{
+    font-style:italic;
+    color:var(--brass);
+  }
+  .sub{
+    font-size:16px;
+    color:var(--muted);
+    max-width:520px;
+    margin:0 auto;
+    line-height:1.55;
+  }
+
+  .stage{
+    display:grid;
+    grid-template-columns:340px 1fr;
+    gap:56px;
+    align-items:start;
+  }
+  @media (max-width:860px){
+    .stage{grid-template-columns:1fr;}
+  }
+
+  /* PHONE */
+  .phone-col{
+    display:flex;
+    justify-content:center;
+  }
+  .phone{
+    width:320px;
+    background:#0b0f12;
+    border-radius:40px;
+    padding:14px;
+    box-shadow:0 40px 80px -30px rgba(0,0,0,.7), 0 0 0 1px #2a3238;
+  }
+  .screen{
+    background:var(--panel);
+    border-radius:28px;
+    overflow:hidden;
+    position:relative;
+  }
+  .notch{
+    position:absolute;
+    top:0; left:50%;
+    transform:translateX(-50%);
+    width:120px;height:20px;
+    background:#0b0f12;
+    border-radius:0 0 14px 14px;
+    z-index:5;
+  }
+  .status{
+    display:flex;
+    justify-content:space-between;
+    padding:16px 20px 4px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--muted);
+  }
+  .topbar{
+    padding:14px 18px 10px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .greet .day{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--brass);
+  }
+  .greet .name{
+    font-family:'Fraunces',serif;
+    font-size:19px;
+    margin-top:2px;
+  }
+  .avatar{
+    width:34px;height:34px;
+    border-radius:50%;
+    background:var(--brass);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Fraunces',serif;
+    font-size:14px;
+    color:var(--ink);
+  }
+  .search{
+    margin:6px 18px 14px;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:10px 14px;
+    font-size:12.5px;
+    color:var(--paper-dim);
+  }
+  .section-label{
+    padding:0 18px 8px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .card{
+    margin:0 14px 10px;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:12px 14px;
+    position:relative;
+  }
+  .card .row-top{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    margin-bottom:6px;
+  }
+  .card .cname{
+    font-size:14px;font-weight:600;color:var(--paper);
+  }
+  .card .cmeta{
+    font-size:11px;color:var(--muted);margin-top:2px;
+  }
+  .tag{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:9.5px;
+    letter-spacing:.05em;
+    padding:3px 8px;
+    border-radius:20px;
+    white-space:nowrap;
+  }
+  .tag.hot{background:rgba(193,80,46,.18); color:#e08361;}
+  .tag.warm{background:rgba(200,155,60,.18); color:var(--brass);}
+  .tag.cool{background:rgba(124,138,144,.18); color:var(--muted);}
+  .brief{
+    font-size:11.5px;
+    color:var(--paper-dim);
+    line-height:1.45;
+    background:var(--ink);
+    border-left:2px solid var(--teal);
+    padding:6px 8px;
+    border-radius:4px;
+    margin-top:2px;
+  }
+  .brief b{color:var(--teal);font-weight:600;}
+  .mic-row{
+    display:flex;align-items:center;gap:6px;
+    margin-top:8px;
+  }
+  .waveform{display:flex;align-items:center;gap:2px;height:16px;}
+  .waveform span{
+    width:2.5px;background:var(--brass);border-radius:2px;
+  }
+  .mic-label{font-size:10.5px;color:var(--muted);font-style:italic;}
+
+  .navbar{
+    display:flex;
+    justify-content:space-around;
+    align-items:center;
+    padding:12px 10px 18px;
+    border-top:1px solid var(--line);
+    margin-top:6px;
+  }
+  .navitem{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:9px;
+    color:var(--muted);
+    text-align:center;
+  }
+  .navitem.active{color:var(--paper);}
+  .rec-btn{
+    width:46px;height:46px;
+    border-radius:50%;
+    background:var(--brass);
+    display:flex;align-items:center;justify-content:center;
+    margin-top:-26px;
+    box-shadow:0 8px 20px -6px rgba(200,155,60,.6);
+  }
+
+  .badge{
+    position:absolute;
+    width:20px;height:20px;
+    border-radius:50%;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Mono',monospace;
+    font-weight:600;
+    font-size:11px;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px var(--ink);
+    z-index:6;
+  }
+  .b1{top:118px; right:-8px;}
+  .b2{top:296px; left:-8px;}
+  .b3{top:222px; right:-8px;}
+  .b4{top:174px; left:-8px;}
+  .b5{top:370px; right:-8px;}
+  .b6{top:6px; left:-8px;}
+
+  /* FEATURE LIST */
+  .features{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    padding-top:8px;
+  }
+  .feat{
+    display:grid;
+    grid-template-columns:38px 1fr;
+    gap:14px;
+    padding:16px 18px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+  }
+  .feat .num{
+    width:30px;height:30px;
+    border-radius:50%;
+    background:var(--ink);
+    border:1px solid var(--brass-dim);
+    color:var(--brass);
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .feat h3{
+    font-family:'Fraunces',serif;
+    font-weight:500;
+    font-size:16.5px;
+    margin:0 0 6px;
+    color:var(--paper);
+  }
+  .feat p{
+    margin:0;
+    font-size:13px;
+    line-height:1.55;
+    color:var(--muted);
+  }
+  .feat .why{
+    display:inline-block;
+    margin-top:8px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    color:var(--teal);
+  }
+
+  footer{
+    text-align:center;
+    margin-top:56px;
+    padding-top:28px;
+    border-top:1px solid var(--line);
+  }
+  footer .line{
+    font-family:'Fraunces',serif;
+    font-style:italic;
+    font-size:20px;
+    color:var(--brass);
+  }
+  footer .small{
+    margin-top:8px;
+    font-size:12px;
+    color:var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Home Screen &mdash; Concept Preview</div>
+    <h1>You talk. It <em>organizes</em>.</h1>
+    <p class="sub">A personal CRM built for agents who work by phone and voice note, not spreadsheets &mdash; starting with real estate agents in Pakistan.</p>
+  </header>
+
+  <div class="stage">
+    <div class="phone-col">
+      <div class="phone">
+        <div class="screen">
+          <div class="notch"></div>
+          <div class="badge b6">6</div>
+          <div class="status"><span>9:41</span><span>&#9679;&#9679;&#9679; 4G</span></div>
+
+          <div class="topbar">
+            <div class="greet">
+              <div class="day">MONDAY, 13 JULY</div>
+              <div class="name">Malik Sahab</div>
+            </div>
+            <div class="avatar">M</div>
+          </div>
+
+          <div class="search">&#128269;&nbsp; Search clients, notes, chats&hellip;</div>
+
+          <div class="section-label">Follow up today</div>
+
+          <div class="card">
+            <div class="badge b1">1</div>
+            <div class="badge b3">3</div>
+            <div class="row-top">
+              <div>
+                <div class="cname">Ayyaz Khan</div>
+                <div class="cmeta">HMR Waterfront &middot; missed site visit</div>
+              </div>
+              <span class="tag hot">HOT</span>
+            </div>
+            <div class="brief"><b>Brief:</b> Last spoke Thu. Wants beachfront, ~2 crore budget, hesitant on price. Reschedule Phase 8 visit.</div>
+          </div>
+
+          <div class="card">
+            <div class="badge b4">4</div>
+            <div class="row-top">
+              <div>
+                <div class="cname">Fatima Sheikh</div>
+                <div class="cmeta">AA Beach Front &middot; 2BR inquiry</div>
+              </div>
+              <span class="tag warm">WARM</span>
+            </div>
+            <div class="mic-row">
+              <div class="waveform">
+                <span style="height:6px"></span><span style="height:12px"></span><span style="height:8px"></span>
+                <span style="height:15px"></span><span style="height:5px"></span><span style="height:10px"></span>
+              </div>
+              <span class="mic-label">voice note &middot; transcribed</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="badge b5">5</div>
+            <div class="row-top">
+              <div>
+                <div class="cname">Bilal Ansari</div>
+                <div class="cmeta">Silent for 9 days</div>
+              </div>
+              <span class="tag cool">COOLING</span>
+            </div>
+          </div>
+
+          <div class="badge b2" style="position:relative;top:0;left:0;margin:2px 18px 10px;width:auto;height:auto;border-radius:8px;padding:6px 10px;display:flex;gap:6px;font-size:10px;background:var(--panel-2);color:var(--paper-dim);box-shadow:none;">
+            <span style="color:var(--brass)">2</span>&nbsp;Share a WhatsApp export here to log it
+          </div>
+
+          <div class="navbar">
+            <div class="navitem active">Home</div>
+            <div class="navitem">Contacts</div>
+            <div class="rec-btn">&#127908;</div>
+            <div class="navitem">Reminders</div>
+            <div class="navitem">Settings</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="features">
+      <div class="feat">
+        <div class="num">1</div>
+        <div>
+          <h3>Today's Follow-Ups</h3>
+          <p>The home screen isn't a contact list &mdash; it's the exact people to call back today, so nothing depends on memory.</p>
+        </div>
+      </div>
+      <div class="feat">
+        <div class="num">2</div>
+        <div>
+          <h3>WhatsApp Chat Import</h3>
+          <p>Export any WhatsApp chat and share it straight into the app. It gets parsed into notes and next steps automatically.</p>
+          <span class="why">the core wedge feature</span>
+        </div>
+      </div>
+      <div class="feat">
+        <div class="num">3</div>
+        <div>
+          <h3>AI Relationship Brief</h3>
+          <p>One line, generated from the whole history, shown before every call &mdash; budget, preference, hesitation, what's next.</p>
+        </div>
+      </div>
+      <div class="feat">
+        <div class="num">4</div>
+        <div>
+          <h3>Client Temperature</h3>
+          <p>Hot, warm, or cooling &mdash; inferred automatically from notes and conversations, not set by hand.</p>
+        </div>
+      </div>
+      <div class="feat">
+        <div class="num">5</div>
+        <div>
+          <h3>Silence Alerts</h3>
+          <p>Flags leads who've gone quiet, so a promising client never quietly slips away.</p>
+        </div>
+      </div>
+      <div class="feat">
+        <div class="num">6</div>
+        <div>
+          <h3>Voice Notes, Roman Urdu Included</h3>
+          <p>Record instead of typing. Transcribed automatically, in the mix of Urdu and English agents actually speak.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="line">"Aap baat karo, app sambhaal legi."</div>
+    <div class="small">Concept preview &middot; Stage 3&ndash;4 features shown</div>
+  </footer>
+
+</div>
+</body>
+</html>
