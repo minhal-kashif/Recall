@@ -1,27 +1,46 @@
 import { useEffect, useState } from 'react'
-import { supabase } from './supabaseClient'
+import { useAuth } from './AuthContext'
+import Login from './Login'
 import './App.css'
 
 function App() {
+  const { session, loading, signOut } = useAuth()
+
+  if (loading) {
+    return (
+      <section id="center">
+        <p>Loading...</p>
+      </section>
+    )
+  }
+
+  if (!session) {
+    return <Login />
+  }
+
+  return <Dashboard session={session} signOut={signOut} />
+}
+
+function Dashboard({ session, signOut }) {
   const [backendStatus, setBackendStatus] = useState('checking...')
-  const [supabaseStatus, setSupabaseStatus] = useState('checking...')
 
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_URL}/api/health`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/me`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
       .then((res) => res.json())
       .then((data) => setBackendStatus(JSON.stringify(data)))
       .catch((err) => setBackendStatus(`error: ${err.message}`))
-
-    supabase.auth.getSession()
-      .then(({ error }) => setSupabaseStatus(error ? `error: ${error.message}` : 'client initialized'))
-      .catch((err) => setSupabaseStatus(`error: ${err.message}`))
-  }, [])
+  }, [session])
 
   return (
     <section id="center">
       <h1>Recall App</h1>
-      <p>Backend health: {backendStatus}</p>
-      <p>Supabase client: {supabaseStatus}</p>
+      <p>Signed in as {session.user.email}</p>
+      <p>Backend /api/me: {backendStatus}</p>
+      <button type="button" onClick={signOut}>
+        Sign out
+      </button>
     </section>
   )
 }

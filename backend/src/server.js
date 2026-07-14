@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const supabase = require('./supabaseClient');
+const requireAuth = require('./middleware/requireAuth');
 
 const app = express();
 app.use(cors());
@@ -16,6 +17,10 @@ app.get('/api/health', async (req, res) => {
     supabaseConfigured: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_KEY),
     supabaseReachable,
   });
+});
+
+app.get('/api/me', requireAuth, (req, res) => {
+  res.json({ id: req.user.id, email: req.user.email });
 });
 
 const PORT = process.env.PORT || 4000;
