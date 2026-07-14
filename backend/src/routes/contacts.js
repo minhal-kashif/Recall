@@ -15,6 +15,13 @@ function pickOne(relation) {
   return Array.isArray(relation) ? relation[0] || null : relation;
 }
 
+// Never forward raw DB error text to the client — it leaks schema/constraint
+// internals (see SECURITY_AUDIT.md M1). Log the real error server-side only.
+function dbError(res, label, error) {
+  console.error(label, error);
+  return res.status(500).json({ error: 'Something went wrong. Please try again.' });
+}
+
 router.get('/', async (req, res) => {
   const db = getUserClient(req.userToken);
   const { data, error } = await db
@@ -22,7 +29,7 @@ router.get('/', async (req, res) => {
     .select('id, name, phone, type, notes, last_interaction_date, created_at, buyer_details(*), seller_details(*)')
     .order('created_at', { ascending: false });
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return dbError(res, 'contacts:list', error);
 
   const { q, type, property_type, area_of_interest } = req.query;
   let results = data;
@@ -82,7 +89,7 @@ router.get('/:id', async (req, res) => {
     .eq('id', req.params.id)
     .maybeSingle();
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return dbError(res, 'contacts:get', error);
   if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
   let details = null;
@@ -109,7 +116,7 @@ router.post('/', async (req, res) => {
     .select()
     .single();
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return dbError(res, 'contacts:create', error);
 
   let details = null;
   if (buyerDetails) {
@@ -118,7 +125,7 @@ router.post('/', async (req, res) => {
       .insert({ ...buyerDetails, contact_id: newContact.id })
       .select()
       .single();
-    if (detailError) return res.status(500).json({ error: detailError.message });
+    if (detailError) return dbError(res, 'contacts:create:buyer_details', detailError);
     details = data;
   } else if (sellerDetails) {
     const { data, error: detailError } = await db
@@ -126,7 +133,7 @@ router.post('/', async (req, res) => {
       .insert({ ...sellerDetails, contact_id: newContact.id })
       .select()
       .single();
-    if (detailError) return res.status(500).json({ error: detailError.message });
+    if (detailError) return dbError(res, 'contacts:create:seller_details', detailError);
     details = data;
   }
 
@@ -142,7 +149,7 @@ router.patch('/:id', async (req, res) => {
     .eq('id', req.params.id)
     .maybeSingle();
 
-  if (fetchError) return res.status(500).json({ error: fetchError.message });
+  if (fetchError) return dbError(res, 'contacts:update:fetch', fetchError);
   if (!existing) return res.status(404).json({ error: 'Contact not found' });
 
   const { errors, contact, buyerDetails, sellerDetails } = validateContactInput(req.body, {
@@ -159,7 +166,7 @@ router.patch('/:id', async (req, res) => {
       .eq('id', req.params.id)
       .select()
       .single();
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return dbError(res, 'contacts:update', error);
     updatedContact = data;
   }
 
@@ -181,7 +188,7 @@ router.patch('/:id', async (req, res) => {
       .upsert({ ...buyerDetails, contact_id: req.params.id }, { onConflict: 'contact_id' })
       .select()
       .single();
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return dbError(res, 'contacts:update:buyer_details', error);
     details = data;
   } else if (sellerDetails && newType === 'seller') {
     const { data, error } = await db
@@ -189,7 +196,7 @@ router.patch('/:id', async (req, res) => {
       .upsert({ ...sellerDetails, contact_id: req.params.id }, { onConflict: 'contact_id' })
       .select()
       .single();
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return dbError(res, 'contacts:update:seller_details', error);
     details = data;
   }
 

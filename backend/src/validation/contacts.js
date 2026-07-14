@@ -1,15 +1,38 @@
 const CONTACT_TYPES = ['buyer', 'seller', 'lead'];
 const PROPERTY_TYPES = ['house', 'apartment'];
 
+const MAX_LENGTHS = {
+  name: 255,
+  phone: 50,
+  notes: 5000,
+  beds_wanted: 50,
+  area_of_interest: 255,
+  property_address: 500,
+  beds: 50,
+  condition_notes: 5000,
+};
+
 function isNonEmptyString(value) {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+// Enforces a max length on an already-known-non-empty string field, pushing
+// an error rather than throwing so multiple validation failures can be
+// reported together (see SECURITY_AUDIT.md M4 — unbounded text was a gap).
+function checkMaxLength(value, field, errors) {
+  const max = MAX_LENGTHS[field];
+  if (max && typeof value === 'string' && value.trim().length > max) {
+    errors.push(`${field} must be ${max} characters or fewer`);
+    return false;
+  }
+  return true;
 }
 
 function toNumberOrUndefined(value, field, errors) {
   if (value === undefined || value === null || value === '') return undefined;
   const num = Number(value);
-  if (Number.isNaN(num)) {
-    errors.push(`${field} must be a number`);
+  if (!Number.isFinite(num)) {
+    errors.push(`${field} must be a finite number`);
     return undefined;
   }
   return num;
@@ -27,12 +50,18 @@ function validateBuyerDetails(body, errors) {
     errors.push(`buyer_details.property_type_wanted must be one of: ${PROPERTY_TYPES.join(', ')}`);
   }
 
+  const bedsWanted = isNonEmptyString(details.beds_wanted) ? details.beds_wanted.trim() : null;
+  if (bedsWanted) checkMaxLength(bedsWanted, 'beds_wanted', errors);
+
+  const areaOfInterest = isNonEmptyString(details.area_of_interest) ? details.area_of_interest.trim() : null;
+  if (areaOfInterest) checkMaxLength(areaOfInterest, 'area_of_interest', errors);
+
   return {
     budget: toNumberOrUndefined(details.budget, 'buyer_details.budget', errors),
-    beds_wanted: isNonEmptyString(details.beds_wanted) ? details.beds_wanted.trim() : null,
+    beds_wanted: bedsWanted,
     size_wanted_sqyd: toNumberOrUndefined(details.size_wanted_sqyd, 'buyer_details.size_wanted_sqyd', errors),
     property_type_wanted: details.property_type_wanted || null,
-    area_of_interest: isNonEmptyString(details.area_of_interest) ? details.area_of_interest.trim() : null,
+    area_of_interest: areaOfInterest,
   };
 }
 
@@ -48,13 +77,22 @@ function validateSellerDetails(body, errors) {
     errors.push(`seller_details.property_type must be one of: ${PROPERTY_TYPES.join(', ')}`);
   }
 
+  const propertyAddress = isNonEmptyString(details.property_address) ? details.property_address.trim() : null;
+  if (propertyAddress) checkMaxLength(propertyAddress, 'property_address', errors);
+
+  const beds = isNonEmptyString(details.beds) ? details.beds.trim() : null;
+  if (beds) checkMaxLength(beds, 'beds', errors);
+
+  const conditionNotes = isNonEmptyString(details.condition_notes) ? details.condition_notes.trim() : null;
+  if (conditionNotes) checkMaxLength(conditionNotes, 'condition_notes', errors);
+
   return {
-    property_address: isNonEmptyString(details.property_address) ? details.property_address.trim() : null,
+    property_address: propertyAddress,
     asking_price: toNumberOrUndefined(details.asking_price, 'seller_details.asking_price', errors),
-    beds: isNonEmptyString(details.beds) ? details.beds.trim() : null,
+    beds,
     size_sqyd: toNumberOrUndefined(details.size_sqyd, 'seller_details.size_sqyd', errors),
     property_type: details.property_type || null,
-    condition_notes: isNonEmptyString(details.condition_notes) ? details.condition_notes.trim() : null,
+    condition_notes: conditionNotes,
   };
 }
 
@@ -67,12 +105,18 @@ function validateContactInput(body, { partial = false, existingType = null } = {
 
   if (!partial || body.name !== undefined) {
     if (!isNonEmptyString(body.name)) errors.push('name is required');
-    else contact.name = body.name.trim();
+    else {
+      contact.name = body.name.trim();
+      checkMaxLength(contact.name, 'name', errors);
+    }
   }
 
   if (!partial || body.phone !== undefined) {
     if (!isNonEmptyString(body.phone)) errors.push('phone is required');
-    else contact.phone = body.phone.trim();
+    else {
+      contact.phone = body.phone.trim();
+      checkMaxLength(contact.phone, 'phone', errors);
+    }
   }
 
   if (!partial || body.type !== undefined) {
@@ -85,6 +129,7 @@ function validateContactInput(body, { partial = false, existingType = null } = {
 
   if (body.notes !== undefined) {
     contact.notes = isNonEmptyString(body.notes) ? body.notes.trim() : null;
+    if (contact.notes) checkMaxLength(contact.notes, 'notes', errors);
   }
 
   let buyerDetails = null;

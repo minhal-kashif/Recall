@@ -1,0 +1,2 @@
+comment on table public.users is
+'RLS: SELECT and UPDATE policies scope to id = auth.uid(). No INSERT policy exists deliberately — the only insert path is the SECURITY DEFINER trigger handle_new_auth_user() (see migration 20260714080000), which has EXECUTE revoked from anon/authenticated. No DELETE policy exists deliberately either — default-deny until account deletion is a real feature; see SECURITY_AUDIT.md finding M3 before adding one.';
