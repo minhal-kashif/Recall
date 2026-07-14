@@ -4,3 +4,4 @@ node_modules
 dist
 dist-ssr
 *.log
+client_secret*.json

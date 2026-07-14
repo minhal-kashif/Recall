@@ -3,10 +3,13 @@ const express = require('express');
 const cors = require('cors');
 const supabase = require('./supabaseClient');
 const requireAuth = require('./middleware/requireAuth');
+const contactsRouter = require('./routes/contacts');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+app.use('/api/contacts', contactsRouter);
 
 app.get('/api/health', async (req, res) => {
   const { error } = await supabase.from('_health_check_').select('*').limit(1);

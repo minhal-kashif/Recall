@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from './AuthContext'
 import Login from './Login'
+import ContactForm from './ContactForm'
 import './App.css'
 
 function App() {
@@ -22,25 +23,67 @@ function App() {
 }
 
 function Dashboard({ session, signOut }) {
-  const [backendStatus, setBackendStatus] = useState('checking...')
+  const [contacts, setContacts] = useState([])
+  const [view, setView] = useState('list') // 'list' | 'add' | { edit: contactId }
+  const [contactsError, setContactsError] = useState(null)
+
+  const apiUrl = import.meta.env.VITE_API_URL
+  const authHeaders = { Authorization: `Bearer ${session.access_token}` }
+
+  const loadContacts = () => {
+    fetch(`${apiUrl}/api/contacts`, { headers: authHeaders })
+      .then((res) => res.json())
+      .then((data) => (Array.isArray(data) ? setContacts(data) : setContactsError(data.error)))
+      .catch((err) => setContactsError(err.message))
+  }
 
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_URL}/api/me`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => setBackendStatus(JSON.stringify(data)))
-      .catch((err) => setBackendStatus(`error: ${err.message}`))
-  }, [session])
+    loadContacts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleSaved = () => {
+    setView('list')
+    loadContacts()
+  }
+
+  if (view === 'add' || (view && view.edit)) {
+    return (
+      <section id="center">
+        <ContactForm
+          session={session}
+          contactId={view.edit}
+          onSaved={handleSaved}
+          onCancel={() => setView('list')}
+        />
+      </section>
+    )
+  }
 
   return (
     <section id="center">
       <h1>Recall App</h1>
       <p>Signed in as {session.user.email}</p>
-      <p>Backend /api/me: {backendStatus}</p>
       <button type="button" onClick={signOut}>
         Sign out
       </button>
+
+      <h2>Contacts</h2>
+      <button type="button" onClick={() => setView('add')}>
+        + Add Contact
+      </button>
+
+      {contactsError && <p style={{ color: 'red' }}>{contactsError}</p>}
+
+      <ul>
+        {contacts.map((c) => (
+          <li key={c.id}>
+            <button type="button" onClick={() => setView({ edit: c.id })}>
+              {c.name} — {c.type} — {c.phone}
+            </button>
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(npm install *)",
-      "mcp__29baf2c3-7074-4a9c-b89c-58160b48c505__execute_sql"
+      "mcp__29baf2c3-7074-4a9c-b89c-58160b48c505__execute_sql",
+      "Bash(curl -s http://localhost:4000/api/health)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //PID 13908 //F)",
+      "Bash(npm run *)"
     ]
   }
 }
