@@ -20,6 +20,12 @@ const emptySellerDetails = {
   condition_notes: '',
 }
 
+// The API returns explicit `null` for unset optional fields; controlled inputs
+// need '' instead, or React logs a value-prop warning and the field goes uncontrolled.
+function nullsToEmptyStrings(obj) {
+  return Object.fromEntries(Object.entries(obj).map(([key, value]) => [key, value === null ? '' : value]))
+}
+
 function ContactForm({ session, contactId, onSaved, onCancel }) {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -48,9 +54,9 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
         setType(data.type || 'lead')
         setNotes(data.notes || '')
         if (data.type === 'seller') {
-          setSellerDetails({ ...emptySellerDetails, ...(data.details || {}) })
+          setSellerDetails({ ...emptySellerDetails, ...nullsToEmptyStrings(data.details || {}) })
         } else {
-          setBuyerDetails({ ...emptyBuyerDetails, ...(data.details || {}) })
+          setBuyerDetails({ ...emptyBuyerDetails, ...nullsToEmptyStrings(data.details || {}) })
         }
         setLoading(false)
       })

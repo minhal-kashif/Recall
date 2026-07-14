@@ -6,7 +6,9 @@
       "Bash(curl -s http://localhost:4000/api/health)",
       "Bash(netstat -ano)",
       "Bash(taskkill //PID 13908 //F)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"unauth /api/me: %{http_code}\\\\n\" http://localhost:4000/api/me)",
+      "Bash(curl -s -o /dev/null -w \"unauth /api/contacts: %{http_code}\\\\n\" http://localhost:4000/api/contacts)"
     ]
   }
 }
