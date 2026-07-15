@@ -21,7 +21,8 @@
       "Bash(curl -s -o /dev/null -w \"unauth GET /api/interactions/:id -> %{http_code}\\\\n\" http://localhost:4000/api/interactions/00000000-0000-0000-0000-000000000000)",
       "mcp__claude-in-chrome__list_connected_browsers",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5173)",
-      "Bash(taskkill //PID 1236 //F)"
+      "Bash(taskkill //PID 1236 //F)",
+      "Bash(taskkill //PID 4372 //F)"
     ]
   }
 }

@@ -3,6 +3,7 @@ const requireAuth = require('../middleware/requireAuth');
 const { getUserClient } = require('../supabaseClient');
 const { validateFollowUpInput, validateFollowUpUpdate } = require('../validation/followUps');
 const dbError = require('../utils/dbError');
+const verifyContactOwnership = require('../utils/verifyContactOwnership');
 
 const router = express.Router();
 
@@ -53,6 +54,11 @@ router.post('/', async (req, res) => {
   if (errors.length) return res.status(400).json({ errors });
 
   const db = getUserClient(req.userToken);
+
+  if (!(await verifyContactOwnership(db, followUp.contact_id))) {
+    return res.status(404).json({ error: 'Contact not found' });
+  }
+
   const { data, error } = await db
     .from('follow_ups')
     .insert({ ...followUp, user_id: req.user.id })

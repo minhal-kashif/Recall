@@ -3,6 +3,7 @@ const requireAuth = require('../middleware/requireAuth');
 const { getUserClient } = require('../supabaseClient');
 const { validateInteractionInput } = require('../validation/interactions');
 const dbError = require('../utils/dbError');
+const verifyContactOwnership = require('../utils/verifyContactOwnership');
 
 const router = express.Router();
 
@@ -25,6 +26,11 @@ router.post('/', async (req, res) => {
   if (errors.length) return res.status(400).json({ errors });
 
   const db = getUserClient(req.userToken);
+
+  if (!(await verifyContactOwnership(db, interaction.contact_id))) {
+    return res.status(404).json({ error: 'Contact not found' });
+  }
+
   const { data, error } = await db
     .from('interactions')
     .insert({ ...interaction, user_id: req.user.id })

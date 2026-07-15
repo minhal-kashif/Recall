@@ -4,6 +4,65 @@ Audit date: 2026-07-14. Scope: full repo at commit `fe1361f` (Stage 1, tickets T
 
 **Update 2026-07-14 (same day, follow-up pass):** All High and Medium findings except M6 have been fixed and re-verified — see the `STATUS` line under each finding below for what was actually re-tested (live HTTP round-trips for H1–H3, unit-level re-execution of the exact vulnerable code path for M1/M4/M5, live SQL re-scan for M3). M6 requires a Supabase Dashboard change, not a code change — still open. L1–L3 were left as-is (Low severity, explicitly deferred in their own fix notes). RLS/anon/IDOR isolation was re-confirmed clean after all fixes: all 6 tables still `rls_enabled: true`, `anon` role still sees 0 rows on `contacts`.
 
+## Update 2026-07-15 — re-audit of new surface (T1.6, T2.1, T2.2)
+
+Scope: everything built since the original audit — `backend/src/routes/interactions.js`, `backend/src/routes/followUps.js`, their validation modules, the new `GET /api/follow-ups/today` route, and the frontend `ContactDetail.jsx` / `FollowUpList.jsx` / `TodayFollowUps.jsx`. Same methodology as the original: reproduce against the live Supabase project, don't theorize.
+
+**One real finding, self-audited below. Everything else checked clean.**
+
+### [M7] `contact_id` ownership is never verified on interaction/follow-up creation
+- **STATUS: FIXED — verified live.** RLS `WITH CHECK` on both `interactions` and `follow_ups` now requires `EXISTS (... contacts.user_id = auth.uid())` (migration `20260715090000_fix_interactions_followups_contact_ownership.sql`), plus a matching Express-layer check (`verifyContactOwnership`) for a clean 404 instead of a raw RLS error. Re-ran the exact exploit: both inserts now fail with `42501: new row violates row-level security policy`. Re-confirmed the legitimate path still works: creating an interaction/follow-up on your own contact still returns `201`, and posting a nonexistent `contact_id` now returns a clean `404 {"error":"Contact not found"}` instead of a 500. No new advisor warnings introduced by the policy change.
+- Severity: Medium
+- Location: `backend/src/routes/interactions.js:24-36` (`POST /`), `backend/src/routes/followUps.js:51-64` (`POST /`); root cause is in the RLS policies themselves — `supabase/migrations/20260714070000_stage1_core_schema.sql`, policies `"Users manage own interactions"` and `"Users manage own follow_ups"`, both `with_check: (user_id = auth.uid())` — neither checks that `contact_id` belongs to a contact the same user owns. `validateInteractionInput` (`backend/src/validation/interactions.js`) and `validateFollowUpInput` (`backend/src/validation/followUps.js`) only check that `contact_id` is a well-formed UUID, not that the caller owns it.
+- Attack: An authenticated user who obtains another tenant's `contact_id` (e.g. a leaked URL, a guessed sequential-feeling UUID, a shared screenshot) can `POST /api/interactions` or `POST /api/follow-ups` with that `contact_id`. The insert succeeds — the server sets `user_id` to the caller correctly, but nothing stops `contact_id` from pointing at someone else's contact.
+- Proof (reproduced live): impersonated two fresh test users (A owns a contact, B does not). As B, inserted an interaction with `contact_id` = A's contact and `user_id` = B — **insert succeeded**. Same test against `follow_ups` — **insert succeeded**.
+- **What this does NOT do (also verified live, not assumed):**
+  - It does **not** leak A's data to B. Querying as B, the `/today` endpoint's `contacts(name)` embed for the injected row resolved to `null` — RLS on `contacts` (`user_id = auth.uid()`) blocks B from reading A's contact even through the join. B's own list would show a follow-up with a blank/unknown contact name, not A's real name.
+  - It does **not** let B write to A's contact. The `interactions_touch_contact` trigger (which updates `contacts.last_interaction_date` on insert) is `SECURITY INVOKER`, not `SECURITY DEFINER` — it runs as B, and B's own RLS on `contacts` blocks the cross-tenant `UPDATE`. Confirmed: A's `last_interaction_date` stayed `null` after B's injected interaction.
+  - A cannot see B's injected row either — A's own reads are scoped to `user_id = auth.uid()` (A's own id), and the injected row's `user_id` is B.
+  - Net effect: **data-integrity pollution scoped entirely to the attacker's own account** (orphaned rows referencing a contact they can't actually see or open), not a confidentiality or write-escalation breach. This is real and should be fixed, but it is not in the same class as a cross-tenant data leak.
+- Fix (mirrors the pattern already used for `buyer_details`/`seller_details`, which correctly check contact ownership via `EXISTS`):
+```sql
+drop policy "Users manage own interactions" on public.interactions;
+create policy "Users manage own interactions"
+  on public.interactions for all
+  using (user_id = auth.uid())
+  with check (
+    user_id = auth.uid()
+    and exists (
+      select 1 from public.contacts
+      where contacts.id = interactions.contact_id
+      and contacts.user_id = auth.uid()
+    )
+  );
+
+drop policy "Users manage own follow_ups" on public.follow_ups;
+create policy "Users manage own follow_ups"
+  on public.follow_ups for all
+  using (user_id = auth.uid())
+  with check (
+    user_id = auth.uid()
+    and exists (
+      select 1 from public.contacts
+      where contacts.id = follow_ups.contact_id
+      and contacts.user_id = auth.uid()
+    )
+  );
+```
+Also worth adding at the Express layer (defense-in-depth, and better UX): fetch the contact via the user-scoped client before inserting, return `404 Contact not found` if it doesn't resolve — turns a generic RLS-violation 500 into a clean, correct error.
+
+### Everything else checked and found clean (self-audit — not skipped, verified)
+- **RLS enabled**: `interactions` and `follow_ups` both `rls_enabled: true` (re-queried live).
+- **No permissive policies**: no `USING (true)` / `WITH CHECK (true)` anywhere in the new policies.
+- **Error handling (M1 pattern)**: grepped all of `backend/src` for `.message` — zero matches. Both new route files correctly use the shared `dbError()` helper; no raw DB error text can leak through the new routes.
+- **Route-ordering bug class**: `GET /today` is registered before `GET /:contactId` in `followUps.js` — confirmed by reading the file, and functionally proven by the live test above returning the correct shaped "today" response, not an empty array from a wildcard-contactId mismatch.
+- **Rate limiting / CORS / Helmet**: both new routers mounted under the same `authLimiter` as `contacts`/`interactions` in `server.js`; no route-specific bypass introduced.
+- **Input validation**: both new validation modules cap string length (`note_text` ≤ 5000, `description` ≤ 500) and validate dates via `Number.isNaN(parsed.getTime())` — no non-finite-style gap like the original M5.
+- **Injection**: no raw/string-built SQL anywhere in the new code; all queries go through the parameterized supabase-js client.
+- **XSS**: grepped `frontend/src` for `dangerouslySetInnerHTML`, `innerHTML`, `eval(` — zero matches in the new components.
+- **Supply chain**: no new dependencies were added for T1.6/T2.1/T2.2; `npm audit` still reports 0 vulnerabilities.
+- **Storage buckets**: still none (Stage 3 not started) — not applicable, as before.
+
 ## Critical findings
 
 **None identified.** This is a claim that was tested, not assumed — see the proofs below and the RLS/IDOR section in particular. Stage 3 (AI/LLM: WhatsApp `.txt` parsing, Whisper transcription — category C in the requested scope) has **not been built yet** (confirmed by grep: no matches for `whatsapp|whisper|openai|anthropic|voice_note` anywhere in `backend/` or `frontend/`, only in planning docs and a migration's enum comment). There is no prompt-injection, LLM-output, or unbounded-AI-consumption surface to audit because that code doesn't exist. Re-run category C in full when Stage 3 is built — do not assume today's clean result carries forward.
