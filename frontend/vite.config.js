@@ -7,6 +7,16 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+      injectManifest: {
+        injectionPoint: undefined,
+      },
+      devOptions: {
+        enabled: true,
+        type: 'module',
+      },
       registerType: 'autoUpdate',
       manifest: {
         name: 'Recall App',

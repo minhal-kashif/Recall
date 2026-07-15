@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from './AuthContext'
 import Login from './Login'
 import ContactForm from './ContactForm'
 import ContactList from './ContactList'
 import ContactDetail from './ContactDetail'
 import TodayFollowUps from './TodayFollowUps'
+import { setupPushNotifications } from './push'
 import './App.css'
 
 function App() {
@@ -30,8 +31,21 @@ function App() {
 //   | { detail: contactId, returnTo: 'today' | 'list' }
 //   | { edit: contactId, returnTo: 'detail', detailReturnTo: 'today' | 'list' }
 function Dashboard({ session, signOut }) {
-  const [view, setView] = useState('today')
+  const [view, setView] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    const contactId = params.get('contact')
+    return contactId ? { detail: contactId, returnTo: 'today' } : 'today'
+  })
   const [listKey, setListKey] = useState(0)
+
+  useEffect(() => {
+    // Clear the deep-link param so a later refresh doesn't re-trigger it.
+    if (window.location.search.includes('contact=')) {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+    setupPushNotifications(session)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleSaved = () => {
     setView(view.edit ? { detail: view.edit, returnTo: view.detailReturnTo } : 'list')

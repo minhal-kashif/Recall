@@ -22,7 +22,18 @@
       "mcp__claude-in-chrome__list_connected_browsers",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5173)",
       "Bash(taskkill //PID 1236 //F)",
-      "Bash(taskkill //PID 4372 //F)"
+      "Bash(taskkill //PID 4372 //F)",
+      "mcp__29baf2c3-7074-4a9c-b89c-58160b48c505__list_extensions",
+      "Bash(npx --yes web-push generate-vapid-keys --json)",
+      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('hex'\\)\\)\")",
+      "Bash(taskkill //PID 9064 //F)",
+      "Bash(taskkill //PID 16636 //F)",
+      "mcp__29baf2c3-7074-4a9c-b89c-58160b48c505__deploy_edge_function",
+      "mcp__29baf2c3-7074-4a9c-b89c-58160b48c505__get_project_url",
+      "Bash(curl -s -o /dev/null -w \"no-secret: %{http_code}\\\\n\" -X POST https://gleuammjovnltispagmg.supabase.co/functions/v1/send-due-followup-pushes)",
+      "Bash(curl -s -o /dev/null -w \"wrong-secret: %{http_code}\\\\n\" -X POST -H \"x-cron-secret: wrong\" https://gleuammjovnltispagmg.supabase.co/functions/v1/send-due-followup-pushes)",
+      "Bash(curl -s -X POST -H \"x-cron-secret: 22fbecbe489dcdea454888ee5d8d86c8543ded2bb4f682e3db01647e8ae7f0dc\" https://gleuammjovnltispagmg.supabase.co/functions/v1/send-due-followup-pushes)",
+      "mcp__29baf2c3-7074-4a9c-b89c-58160b48c505__get_logs"
     ]
   }
 }

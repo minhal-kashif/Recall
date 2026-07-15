@@ -73,6 +73,12 @@ router.patch('/:id', async (req, res) => {
   const { errors, update } = validateFollowUpUpdate(req.body);
   if (errors.length) return res.status(400).json({ errors });
 
+  // A due_date change (snooze/reschedule) means this is effectively a new
+  // reminder — clear notified_at so the push job can fire again for it.
+  if (update.due_date !== undefined) {
+    update.notified_at = null;
+  }
+
   const db = getUserClient(req.userToken);
   const { data, error } = await db
     .from('follow_ups')
