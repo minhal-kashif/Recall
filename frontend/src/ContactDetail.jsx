@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import FollowUpList from './FollowUpList'
 
 function ContactDetail({ session, contactId, onEdit, onBack }) {
   const [contact, setContact] = useState(null)
@@ -103,6 +104,8 @@ function ContactDetail({ session, contactId, onEdit, onBack }) {
           <p>Condition notes: {details.condition_notes || '—'}</p>
         </section>
       )}
+
+      <FollowUpList session={session} contactId={contactId} />
 
       <section>
         <h3>Add a note</h3>
