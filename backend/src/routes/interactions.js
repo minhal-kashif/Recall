@@ -11,6 +11,11 @@ router.use(requireAuth);
 
 router.get('/:contactId', async (req, res) => {
   const db = getUserClient(req.userToken);
+
+  if (!(await verifyContactOwnership(db, req.params.contactId))) {
+    return res.status(404).json({ error: 'Contact not found' });
+  }
+
   const { data, error } = await db
     .from('interactions')
     .select('id, note_text, interaction_date, source')

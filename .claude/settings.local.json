@@ -32,8 +32,8 @@
       "mcp__29baf2c3-7074-4a9c-b89c-58160b48c505__get_project_url",
       "Bash(curl -s -o /dev/null -w \"no-secret: %{http_code}\\\\n\" -X POST https://gleuammjovnltispagmg.supabase.co/functions/v1/send-due-followup-pushes)",
       "Bash(curl -s -o /dev/null -w \"wrong-secret: %{http_code}\\\\n\" -X POST -H \"x-cron-secret: wrong\" https://gleuammjovnltispagmg.supabase.co/functions/v1/send-due-followup-pushes)",
-      "Bash(curl -s -X POST -H \"x-cron-secret: 22fbecbe489dcdea454888ee5d8d86c8543ded2bb4f682e3db01647e8ae7f0dc\" https://gleuammjovnltispagmg.supabase.co/functions/v1/send-due-followup-pushes)",
-      "mcp__29baf2c3-7074-4a9c-b89c-58160b48c505__get_logs"
+      "mcp__29baf2c3-7074-4a9c-b89c-58160b48c505__get_logs",
+      "Bash(ngrok version *)"
     ]
   }
 }
