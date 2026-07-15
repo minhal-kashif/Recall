@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { apiFetch } from './api'
 
 function ContactList({ session, onSelect, onAdd }) {
   const [q, setQ] = useState('')
@@ -8,8 +9,7 @@ function ContactList({ session, onSelect, onAdd }) {
   const [contacts, setContacts] = useState([])
   const [error, setError] = useState(null)
 
-  const apiUrl = import.meta.env.VITE_API_URL
-  const authHeaders = { Authorization: `Bearer ${session.access_token}` }
+  const token = session.access_token
 
   useEffect(() => {
     const params = new URLSearchParams()
@@ -18,14 +18,23 @@ function ContactList({ session, onSelect, onAdd }) {
     if (propertyType) params.set('property_type', propertyType)
     if (areaOfInterest) params.set('area_of_interest', areaOfInterest)
 
+    // AbortController, not just the debounce timer, matters here: the timer
+    // only stops a fetch that hasn't started yet. Once in flight, an older
+    // request can still resolve after a newer one and silently overwrite the
+    // list with stale results — clearTimeout alone doesn't prevent that.
+    const controller = new AbortController()
     const timeoutId = setTimeout(() => {
-      fetch(`${apiUrl}/api/contacts?${params.toString()}`, { headers: authHeaders })
-        .then((res) => res.json())
+      apiFetch(`/api/contacts?${params.toString()}`, { token, signal: controller.signal })
         .then((data) => (Array.isArray(data) ? setContacts(data) : setError(data.error)))
-        .catch((err) => setError(err.message))
+        .catch((err) => {
+          if (err.message !== 'cancelled') setError(err.message)
+        })
     }, 300)
 
-    return () => clearTimeout(timeoutId)
+    return () => {
+      clearTimeout(timeoutId)
+      controller.abort()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, type, propertyType, areaOfInterest])
 
@@ -39,22 +48,28 @@ function ContactList({ session, onSelect, onAdd }) {
       <div>
         <input
           type="search"
+          aria-label="Search by name or phone"
           placeholder="Search by name or phone"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <select value={type} onChange={(e) => setType(e.target.value)}>
+        <select aria-label="Filter by type" value={type} onChange={(e) => setType(e.target.value)}>
           <option value="">All types</option>
           <option value="buyer">Buyer</option>
           <option value="seller">Seller</option>
           <option value="lead">Lead</option>
         </select>
-        <select value={propertyType} onChange={(e) => setPropertyType(e.target.value)}>
+        <select
+          aria-label="Filter by property type"
+          value={propertyType}
+          onChange={(e) => setPropertyType(e.target.value)}
+        >
           <option value="">All property types</option>
           <option value="house">House</option>
           <option value="apartment">Apartment</option>
         </select>
         <input
+          aria-label="Filter by area of interest"
           placeholder="Area of interest"
           value={areaOfInterest}
           onChange={(e) => setAreaOfInterest(e.target.value)}

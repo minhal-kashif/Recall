@@ -12,6 +12,22 @@ function isValidDate(value) {
   return !Number.isNaN(parsed.getTime());
 }
 
+// Parses due_date and requires it to be in the future — a follow-up
+// reminder due in the past makes no sense. Pushes an error and returns
+// undefined on failure so callers can just skip assigning the field.
+function parseFutureDueDate(value, errors) {
+  if (!isValidDate(value)) {
+    errors.push('due_date must be a valid date');
+    return undefined;
+  }
+  const parsed = new Date(value);
+  if (parsed.getTime() <= Date.now()) {
+    errors.push('due_date must be in the future');
+    return undefined;
+  }
+  return parsed.toISOString();
+}
+
 // Validates a new-follow-up payload. Returns { errors, followUp }.
 function validateFollowUpInput(body) {
   const errors = [];
@@ -34,11 +50,8 @@ function validateFollowUpInput(body) {
     }
   }
 
-  if (!isValidDate(body.due_date)) {
-    errors.push('due_date must be a valid date');
-  } else {
-    followUp.due_date = new Date(body.due_date).toISOString();
-  }
+  const dueDate = parseFutureDueDate(body.due_date, errors);
+  if (dueDate) followUp.due_date = dueDate;
 
   return { errors, followUp };
 }
@@ -58,11 +71,8 @@ function validateFollowUpUpdate(body) {
   }
 
   if (body.due_date !== undefined) {
-    if (!isValidDate(body.due_date)) {
-      errors.push('due_date must be a valid date');
-    } else {
-      update.due_date = new Date(body.due_date).toISOString();
-    }
+    const dueDate = parseFutureDueDate(body.due_date, errors);
+    if (dueDate) update.due_date = dueDate;
   }
 
   if (body.description !== undefined) {

@@ -37,13 +37,25 @@ function Dashboard({ session, signOut }) {
     return contactId ? { detail: contactId, returnTo: 'today' } : 'today'
   })
   const [listKey, setListKey] = useState(0)
+  const [pushWarning, setPushWarning] = useState(null)
 
   useEffect(() => {
     // Clear the deep-link param so a later refresh doesn't re-trigger it.
     if (window.location.search.includes('contact=')) {
       window.history.replaceState({}, '', window.location.pathname)
     }
-    setupPushNotifications(session)
+    // Push reminders failing is silent by default — for a "don't forget
+    // this client" app, that's worth surfacing rather than leaving the
+    // user to assume reminders are working when they aren't. Only shown on
+    // failure; this is not the old step-by-step debug banner.
+    setupPushNotifications(session).then((result) => {
+      if (result.ok) return
+      setPushWarning(
+        result.step === 'permission'
+          ? "Notifications are turned off, so you won't get push reminders when the app is closed. Enable them in your browser/device settings if you'd like alerts."
+          : "Couldn't set up push reminders on this device. You'll still see follow-ups in the app.",
+      )
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -63,6 +75,8 @@ function Dashboard({ session, signOut }) {
       <button type="button" onClick={signOut}>
         Sign out
       </button>
+
+      {pushWarning && <p style={{ color: '#b45309' }}>🔕 {pushWarning}</p>}
 
       <nav>
         <button type="button" onClick={() => setView('today')}>

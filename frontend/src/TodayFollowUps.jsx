@@ -1,17 +1,20 @@
 import { useEffect, useState } from 'react'
+import { apiFetch } from './api'
 
 function TodayFollowUps({ session, onSelectContact }) {
   const [followUps, setFollowUps] = useState(null)
   const [error, setError] = useState(null)
 
-  const apiUrl = import.meta.env.VITE_API_URL
-  const authHeaders = { Authorization: `Bearer ${session.access_token}` }
+  const token = session.access_token
 
   useEffect(() => {
-    fetch(`${apiUrl}/api/follow-ups/today`, { headers: authHeaders })
-      .then((res) => res.json())
+    const controller = new AbortController()
+    apiFetch('/api/follow-ups/today', { token, signal: controller.signal })
       .then((data) => (Array.isArray(data) ? setFollowUps(data) : setError(data.error)))
-      .catch((err) => setError(err.message))
+      .catch((err) => {
+        if (err.message !== 'cancelled') setError(err.message)
+      })
+    return () => controller.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

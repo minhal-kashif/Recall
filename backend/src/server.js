@@ -19,12 +19,19 @@ app.use(cors({ origin: allowedOrigins }));
 
 app.use(express.json());
 
+// express-rate-limit's default 429 body is plain text, not JSON — every
+// frontend fetch call here does res.json() unconditionally, so a plain-text
+// body throws a parse error instead of surfacing a real message. Match the
+// { error } shape the rest of the API already uses.
+const rateLimitMessage = { error: 'Too many requests. Please slow down and try again shortly.' };
+
 // General ceiling on all API traffic.
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  message: rateLimitMessage,
 });
 app.use('/api', apiLimiter);
 
@@ -35,6 +42,7 @@ const authLimiter = rateLimit({
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  message: rateLimitMessage,
 });
 
 app.use('/api/contacts', authLimiter, contactsRouter);

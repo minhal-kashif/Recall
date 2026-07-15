@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { apiFetch } from './api'
 
 const BEDS_OPTIONS = ['Studio', '1', '2', '3', '4+']
 const PROPERTY_TYPES = ['house', 'apartment']
@@ -37,17 +38,13 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
-  const apiUrl = import.meta.env.VITE_API_URL
-  const authHeaders = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${session.access_token}`,
-  }
+  const token = session.access_token
 
   useEffect(() => {
     if (!contactId) return
 
-    fetch(`${apiUrl}/api/contacts/${contactId}`, { headers: authHeaders })
-      .then((res) => res.json())
+    const controller = new AbortController()
+    apiFetch(`/api/contacts/${contactId}`, { token, signal: controller.signal })
       .then((data) => {
         setName(data.name || '')
         setPhone(data.phone || '')
@@ -61,9 +58,11 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
         setLoading(false)
       })
       .catch((err) => {
+        if (err.message === 'cancelled') return
         setError(err.message)
         setLoading(false)
       })
+    return () => controller.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contactId])
 
@@ -79,17 +78,11 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
       payload.seller_details = sellerDetails
     }
 
-    const url = contactId ? `${apiUrl}/api/contacts/${contactId}` : `${apiUrl}/api/contacts`
+    const url = contactId ? `/api/contacts/${contactId}` : '/api/contacts'
     const method = contactId ? 'PATCH' : 'POST'
 
     try {
-      const res = await fetch(url, { method, headers: authHeaders, body: JSON.stringify(payload) })
-      const data = await res.json()
-      if (!res.ok) {
-        setError((data.errors && data.errors.join(', ')) || data.error || 'Something went wrong')
-        setSubmitting(false)
-        return
-      }
+      const data = await apiFetch(url, { method, token, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       onSaved(data)
     } catch (err) {
       setError(err.message)

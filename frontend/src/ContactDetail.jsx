@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import FollowUpList from './FollowUpList'
+import { apiFetch } from './api'
 
 function ContactDetail({ session, contactId, onEdit, onBack }) {
   const [contact, setContact] = useState(null)
@@ -8,26 +9,33 @@ function ContactDetail({ session, contactId, onEdit, onBack }) {
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const apiUrl = import.meta.env.VITE_API_URL
-  const authHeaders = { Authorization: `Bearer ${session.access_token}` }
+  const token = session.access_token
 
-  const loadContact = () => {
-    fetch(`${apiUrl}/api/contacts/${contactId}`, { headers: authHeaders })
-      .then((res) => res.json())
+  // Optional signal: passed by the mount/contactId-change effect below so a
+  // superseded request (e.g. rapidly switching contacts) can't resolve after
+  // a newer one and overwrite state with stale data; plain manual reloads
+  // (e.g. after adding a note) don't need it since there's nothing to race.
+  const loadContact = (signal) => {
+    apiFetch(`/api/contacts/${contactId}`, { token, signal })
       .then(setContact)
-      .catch((err) => setError(err.message))
+      .catch((err) => {
+        if (err.message !== 'cancelled') setError(err.message)
+      })
   }
 
-  const loadInteractions = () => {
-    fetch(`${apiUrl}/api/interactions/${contactId}`, { headers: authHeaders })
-      .then((res) => res.json())
-      .then((data) => (Array.isArray(data) ? setInteractions(data) : setError(data.error)))
-      .catch((err) => setError(err.message))
+  const loadInteractions = (signal) => {
+    apiFetch(`/api/interactions/${contactId}`, { token, signal })
+      .then(setInteractions)
+      .catch((err) => {
+        if (err.message !== 'cancelled') setError(err.message)
+      })
   }
 
   useEffect(() => {
-    loadContact()
-    loadInteractions()
+    const controller = new AbortController()
+    loadContact(controller.signal)
+    loadInteractions(controller.signal)
+    return () => controller.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contactId])
 
@@ -37,17 +45,12 @@ function ContactDetail({ session, contactId, onEdit, onBack }) {
     setError(null)
 
     try {
-      const res = await fetch(`${apiUrl}/api/interactions`, {
+      await apiFetch('/api/interactions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        token,
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contact_id: contactId, note_text: noteText }),
       })
-      const data = await res.json()
-      if (!res.ok) {
-        setError((data.errors && data.errors.join(', ')) || data.error || 'Something went wrong')
-        setSubmitting(false)
-        return
-      }
       setNoteText('')
       loadInteractions()
       loadContact() // last_interaction_date changed
@@ -58,7 +61,9 @@ function ContactDetail({ session, contactId, onEdit, onBack }) {
     }
   }
 
-  if (!contact) return <p>Loading...</p>
+  if (!contact) {
+    return error ? <p style={{ color: 'red' }}>{error}</p> : <p>Loading...</p>
+  }
 
   const details = contact.details || {}
 
@@ -111,6 +116,7 @@ function ContactDetail({ session, contactId, onEdit, onBack }) {
         <h3>Add a note</h3>
         <form onSubmit={handleAddNote}>
           <textarea
+            aria-label="What was discussed?"
             value={noteText}
             onChange={(e) => setNoteText(e.target.value)}
             placeholder="What was discussed?"
