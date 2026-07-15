@@ -8,9 +8,33 @@ const router = express.Router();
 
 router.use(requireAuth);
 
-// NOTE (T2.2): a literal GET /today route must be registered here, BEFORE
-// GET /:contactId below — otherwise Express would match "today" as a
-// contactId value instead of routing to the dedicated handler.
+// Must stay registered before GET /:contactId below — otherwise Express
+// would match "today" as a contactId value instead of routing here.
+router.get('/today', async (req, res) => {
+  const db = getUserClient(req.userToken);
+  const { data, error } = await db
+    .from('follow_ups')
+    .select('id, description, due_date, status, contact_id, contacts(name)')
+    .eq('status', 'pending')
+    .lte('due_date', new Date().toISOString())
+    .order('due_date', { ascending: true });
+
+  if (error) return dbError(res, 'follow_ups:today', error);
+
+  const shaped = data.map((f) => {
+    const contact = Array.isArray(f.contacts) ? f.contacts[0] : f.contacts;
+    return {
+      id: f.id,
+      description: f.description,
+      due_date: f.due_date,
+      status: f.status,
+      contact_id: f.contact_id,
+      contact_name: contact ? contact.name : null,
+    };
+  });
+
+  res.json(shaped);
+});
 
 router.get('/:contactId', async (req, res) => {
   const db = getUserClient(req.userToken);

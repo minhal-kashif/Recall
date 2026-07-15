@@ -4,6 +4,7 @@ import Login from './Login'
 import ContactForm from './ContactForm'
 import ContactList from './ContactList'
 import ContactDetail from './ContactDetail'
+import TodayFollowUps from './TodayFollowUps'
 import './App.css'
 
 function App() {
@@ -24,18 +25,21 @@ function App() {
   return <Dashboard session={session} signOut={signOut} />
 }
 
-// view: 'list' | 'add' | { detail: contactId } | { edit: contactId, returnTo: 'list' | 'detail' }
+// view:
+//   'today' | 'list' | 'add'
+//   | { detail: contactId, returnTo: 'today' | 'list' }
+//   | { edit: contactId, returnTo: 'detail', detailReturnTo: 'today' | 'list' }
 function Dashboard({ session, signOut }) {
-  const [view, setView] = useState('list')
+  const [view, setView] = useState('today')
   const [listKey, setListKey] = useState(0)
 
   const handleSaved = () => {
-    setView(view.edit && view.returnTo === 'detail' ? { detail: view.edit } : 'list')
+    setView(view.edit ? { detail: view.edit, returnTo: view.detailReturnTo } : 'list')
     setListKey((k) => k + 1)
   }
 
   const handleCancelForm = () => {
-    setView(view.edit && view.returnTo === 'detail' ? { detail: view.edit } : 'list')
+    setView(view.edit ? { detail: view.edit, returnTo: view.detailReturnTo } : 'list')
   }
 
   return (
@@ -46,21 +50,32 @@ function Dashboard({ session, signOut }) {
         Sign out
       </button>
 
+      <nav>
+        <button type="button" onClick={() => setView('today')}>
+          Today's Follow-Ups
+        </button>
+        <button type="button" onClick={() => setView('list')}>
+          All Contacts
+        </button>
+      </nav>
+
       {view === 'add' || (view && view.edit) ? (
         <ContactForm session={session} contactId={view.edit} onSaved={handleSaved} onCancel={handleCancelForm} />
       ) : view && view.detail ? (
         <ContactDetail
           session={session}
           contactId={view.detail}
-          onEdit={(id) => setView({ edit: id, returnTo: 'detail' })}
-          onBack={() => setView('list')}
+          onEdit={(id) => setView({ edit: id, returnTo: 'detail', detailReturnTo: view.returnTo })}
+          onBack={() => setView(view.returnTo || 'list')}
         />
+      ) : view === 'today' ? (
+        <TodayFollowUps session={session} onSelectContact={(id) => setView({ detail: id, returnTo: 'today' })} />
       ) : (
         <ContactList
           key={listKey}
           session={session}
           onAdd={() => setView('add')}
-          onSelect={(id) => setView({ detail: id })}
+          onSelect={(id) => setView({ detail: id, returnTo: 'list' })}
         />
       )}
     </section>
