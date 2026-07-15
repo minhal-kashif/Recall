@@ -16,7 +16,11 @@
       "Bash(curl -s -H \"Origin: http://evil.com\" -I http://localhost:4000/api/health)",
       "Bash(curl -s http://localhost:4000/api/contacts/not-a-valid-uuid -H \"Authorization: Bearer garbage-token\")",
       "Bash(npm audit *)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(taskkill //PID 19072 //F)",
+      "Bash(curl -s -o /dev/null -w \"unauth GET /api/interactions/:id -> %{http_code}\\\\n\" http://localhost:4000/api/interactions/00000000-0000-0000-0000-000000000000)",
+      "mcp__claude-in-chrome__list_connected_browsers",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5173)"
     ]
   }
 }

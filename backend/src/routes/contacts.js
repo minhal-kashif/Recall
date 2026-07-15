@@ -2,6 +2,7 @@ const express = require('express');
 const requireAuth = require('../middleware/requireAuth');
 const { getUserClient } = require('../supabaseClient');
 const { validateContactInput } = require('../validation/contacts');
+const dbError = require('../utils/dbError');
 
 const router = express.Router();
 
@@ -13,13 +14,6 @@ router.use(requireAuth);
 function pickOne(relation) {
   if (!relation) return null;
   return Array.isArray(relation) ? relation[0] || null : relation;
-}
-
-// Never forward raw DB error text to the client — it leaks schema/constraint
-// internals (see SECURITY_AUDIT.md M1). Log the real error server-side only.
-function dbError(res, label, error) {
-  console.error(label, error);
-  return res.status(500).json({ error: 'Something went wrong. Please try again.' });
 }
 
 router.get('/', async (req, res) => {

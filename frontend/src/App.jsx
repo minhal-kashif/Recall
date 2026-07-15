@@ -3,6 +3,7 @@ import { useAuth } from './AuthContext'
 import Login from './Login'
 import ContactForm from './ContactForm'
 import ContactList from './ContactList'
+import ContactDetail from './ContactDetail'
 import './App.css'
 
 function App() {
@@ -23,13 +24,18 @@ function App() {
   return <Dashboard session={session} signOut={signOut} />
 }
 
+// view: 'list' | 'add' | { detail: contactId } | { edit: contactId, returnTo: 'list' | 'detail' }
 function Dashboard({ session, signOut }) {
-  const [view, setView] = useState('list') // 'list' | 'add' | { edit: contactId }
+  const [view, setView] = useState('list')
   const [listKey, setListKey] = useState(0)
 
   const handleSaved = () => {
-    setView('list')
+    setView(view.edit && view.returnTo === 'detail' ? { detail: view.edit } : 'list')
     setListKey((k) => k + 1)
+  }
+
+  const handleCancelForm = () => {
+    setView(view.edit && view.returnTo === 'detail' ? { detail: view.edit } : 'list')
   }
 
   return (
@@ -41,18 +47,20 @@ function Dashboard({ session, signOut }) {
       </button>
 
       {view === 'add' || (view && view.edit) ? (
-        <ContactForm
+        <ContactForm session={session} contactId={view.edit} onSaved={handleSaved} onCancel={handleCancelForm} />
+      ) : view && view.detail ? (
+        <ContactDetail
           session={session}
-          contactId={view.edit}
-          onSaved={handleSaved}
-          onCancel={() => setView('list')}
+          contactId={view.detail}
+          onEdit={(id) => setView({ edit: id, returnTo: 'detail' })}
+          onBack={() => setView('list')}
         />
       ) : (
         <ContactList
           key={listKey}
           session={session}
           onAdd={() => setView('add')}
-          onSelect={(id) => setView({ edit: id })}
+          onSelect={(id) => setView({ detail: id })}
         />
       )}
     </section>

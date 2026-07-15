@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const supabase = require('./supabaseClient');
 const requireAuth = require('./middleware/requireAuth');
 const contactsRouter = require('./routes/contacts');
+const interactionsRouter = require('./routes/interactions');
 
 const app = express();
 
@@ -35,6 +36,7 @@ const authLimiter = rateLimit({
 });
 
 app.use('/api/contacts', authLimiter, contactsRouter);
+app.use('/api/interactions', authLimiter, interactionsRouter);
 
 app.get('/api/health', async (req, res) => {
   const { error } = await supabase.from('_health_check_').select('*').limit(1);
