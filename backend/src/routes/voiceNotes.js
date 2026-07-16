@@ -21,6 +21,20 @@ const upload = multer({
 const ALLOWED_MIME_TYPES = ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg'];
 const SIGNED_URL_TTL_SECONDS = 3600;
 
+// Wrap multer so its errors return clean statuses instead of falling through
+// to the catch-all 500 (SECURITY_AUDIT.md L4): oversized file -> 413.
+function uploadAudio(req, res, next) {
+  upload.single('audio')(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'Audio file is too large (max 10 MB).' });
+      }
+      return res.status(400).json({ error: 'Audio upload failed.' });
+    }
+    next();
+  });
+}
+
 router.get('/:contactId', async (req, res) => {
   const db = getUserClient(req.userToken);
 
@@ -56,7 +70,7 @@ router.get('/:contactId', async (req, res) => {
   res.json(shaped);
 });
 
-router.post('/', upload.single('audio'), async (req, res) => {
+router.post('/', uploadAudio, async (req, res) => {
   const { errors, contact_id, duration_seconds } = validateVoiceNoteInput(req.body);
   if (errors.length) return res.status(400).json({ errors });
 

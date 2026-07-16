@@ -116,6 +116,35 @@ Scope: `supabase/migrations/20260715110000_create_silence_reminders_job.sql` —
 - **Advisors**: `get_advisors(type: security)` still returns only the pre-existing, already-documented M6. No new warning from this migration.
 - **Live-verified functional correctness** (not a security finding, but proves the RLS-bypass is actually being used narrowly and correctly, not as a blank check): ran the function against real backdated test contacts — created exactly one reminder per stale contact, created zero duplicates on a second run, created zero reminders for a contact only 5 days stale, and correctly distinguished "marked done + logged a real interaction" (no re-fire) from "marked done with no interaction" (re-fires next run) — i.e. the privileged function only ever does the one narrow `INSERT` it was written for. Test data fully cleaned up afterward.
 
+## Update 2026-07-16 — T3 voice notes / storage surface
+
+Scope: everything in the voice-note feature — migration `20260716120000_stage3_voice_notes_schema.sql` (the `voice_notes` table + the private `voice-notes` Storage bucket + four `storage.objects` policies), `backend/src/routes/voiceNotes.js`, `backend/src/validation/voiceNotes.js`, and `frontend/src/VoiceNotes.jsx`. Same methodology as the prior audits: reproduce against the live project, don't theorize.
+
+**No cross-tenant or key-exposure findings. Two low-severity notes, documented below. The AI layers (Whisper transcription, WhatsApp/Haiku) are NOT built — they stay parked pending AI-cost approval and get their own review when they land (prompt injection, LLM-output validation, denial-of-wallet, key handling).**
+
+### Verified clean (live, not assumed)
+- **Bucket is private**: `storage.buckets.public = false` for `voice-notes` (re-queried live). Audio is never publicly reachable; access is only via short-lived signed URLs generated server-side.
+- **`voice_notes` table RLS** (from T3.1, re-confirmed): single `FOR ALL` policy using the M7 ownership pattern — `USING (user_id = auth.uid())`, `WITH CHECK (user_id = auth.uid() AND EXISTS(contact owned by auth.uid()))`. Live impersonation: the real user can insert a note on their own contact and read it; a fake attacker sees **0** rows and is rejected with `42501` when attaching a note to the real user's contact.
+- **Storage `objects` RLS — full live IDOR test** against the real object written during the T3.4 device test (path `<A-uid>/<contact>/<uuid>.webm`):
+  - Read: as owner A → sees their 1 object; as attacker B → **0** objects visible.
+  - Write: B attempting `INSERT` of an object whose name is under A's user folder → rejected, `42501: new row violates row-level security policy for table "objects"`.
+  - All four policies (select/insert/update/delete) gate on `bucket_id = 'voice-notes'` AND `(storage.foldername(name))[1] = auth.uid()::text`, so a user can only ever touch objects under their own `<uid>/…` prefix.
+- **No `service_role` anywhere in this surface**: the route uses only the per-request user-scoped client (anon key + caller's JWT). `createSignedUrl` is called through that client, so a signed URL can only be minted for an object the caller's own JWT can `SELECT` under storage RLS — a user cannot sign someone else's audio. No secret/service key is used or needed.
+- **No path-traversal / client-controlled storage path**: the object path is built server-side from `req.user.id` + a **UUID-validated** `contact_id` + `crypto.randomUUID()`. The client never supplies the path; the GET signs the stored (server-written) `storage_path`. There is no way for a client to escape its own folder or point at another user's object.
+- **App-layer defense in depth**: `verifyContactOwnership` runs on both the upload POST and the list GET, returning a clean `404` before any storage work, consistent with the other routes — RLS is the boundary, this is the friendly error.
+- **Upload abuse / cost controls**: a hard 10 MB `multer` memory-storage file cap (the authoritative ceiling), a MIME allowlist checked on the normalized base type, and a dedicated `voiceUploadLimiter` (10/min) on the POST on top of the shared `authLimiter`. No AI is called, so there is no denial-of-wallet vector in this surface yet — storage cost is bounded by cap × rate.
+- **Advisors**: `get_advisors(type: security)` after the migration returns only the pre-existing, already-documented **M6** (leaked-password protection). The new table and storage policies introduced no new warning.
+- **Frontend**: `VoiceNotes.jsx` uses the native `Notification`-free `<audio>` element and `MediaRecorder`; no `dangerouslySetInnerHTML`/`eval`. Mic tracks are stopped and object URLs revoked on stop/unmount. Signed URLs are fetched fresh per list load, never persisted.
+
+### [L4] Oversized upload returned a generic 500, not 413 — FIXED
+- Severity: Low. **STATUS: FIXED.** A file exceeding the 10 MB `multer` limit raised a `MulterError` (`LIMIT_FILE_SIZE`) that propagated to the catch-all error handler and returned `500 {"error":"Internal server error"}`. Wrapped the multer middleware (`uploadAudio` in `routes/voiceNotes.js`) so `LIMIT_FILE_SIZE` now returns `413 {"error":"Audio file is too large (max 10 MB)."}` and any other upload error returns a clean `400` — neither falls through to the generic 500. Functionally the file was always rejected (nothing stored); this just makes the status/UX correct.
+
+### [L5] Upload MIME type is client-declared
+- Severity: Low. `req.file.mimetype` comes from the multipart part's `Content-Type`, which the client controls, so a non-audio file could be uploaded with a spoofed `audio/*` type past the allowlist. **Impact is contained**: the object can only land in the uploader's own private `<uid>/…` folder, is only ever served back to that same owner via a per-owner signed URL (storage RLS blocks everyone else), and is never executed — so the worst case is a user storing junk in their own private space, bounded by the 10 MB cap and the rate limit. It is **not** a cross-tenant leak or a code-execution vector. Magic-byte content sniffing would harden it but is over-engineering for this threat model; documented rather than fixed.
+
+### Signed-URL TTL note (not a finding)
+Playback URLs are minted with a 3600s (1h) TTL, generated per request and never stored. A leaked URL grants 1h of access to that one audio object — inherent to signed URLs and acceptable here; shorten to 5–15 min if a tighter window is ever wanted.
+
 ## Critical findings
 
 **None identified.** This is a claim that was tested, not assumed — see the proofs below and the RLS/IDOR section in particular. Stage 3 (AI/LLM: WhatsApp `.txt` parsing, Whisper transcription — category C in the requested scope) has **not been built yet** (confirmed by grep: no matches for `whatsapp|whisper|openai|anthropic|voice_note` anywhere in `backend/` or `frontend/`, only in planning docs and a migration's enum comment). There is no prompt-injection, LLM-output, or unbounded-AI-consumption surface to audit because that code doesn't exist. Re-run category C in full when Stage 3 is built — do not assume today's clean result carries forward.
