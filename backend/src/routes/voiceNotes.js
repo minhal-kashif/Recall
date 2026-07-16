@@ -64,7 +64,10 @@ router.post('/', upload.single('audio'), async (req, res) => {
     return res.status(400).json({ error: 'audio file is required' });
   }
 
-  if (!ALLOWED_MIME_TYPES.includes(req.file.mimetype)) {
+  // MediaRecorder reports types like "audio/webm;codecs=opus" — match on the
+  // base type so a codec suffix doesn't get a legitimate recording rejected.
+  const baseMime = req.file.mimetype.split(';')[0].trim().toLowerCase();
+  if (!ALLOWED_MIME_TYPES.includes(baseMime)) {
     return res.status(400).json({ error: 'Unsupported audio file type' });
   }
 
@@ -78,7 +81,7 @@ router.post('/', upload.single('audio'), async (req, res) => {
 
   const { error: uploadError } = await db.storage
     .from('voice-notes')
-    .upload(storagePath, req.file.buffer, { contentType: req.file.mimetype });
+    .upload(storagePath, req.file.buffer, { contentType: baseMime });
 
   if (uploadError) return dbError(res, 'voice_notes:upload', uploadError);
 
