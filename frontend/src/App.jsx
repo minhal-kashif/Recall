@@ -59,8 +59,14 @@ function Dashboard({ session, signOut }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleSaved = () => {
-    setView(view.edit ? { detail: view.edit, returnTo: view.detailReturnTo } : 'list')
+  const handleSaved = (saved) => {
+    if (view.edit) {
+      setView({ detail: view.edit, returnTo: view.detailReturnTo })
+    } else if (saved && saved.id) {
+      setView({ detail: saved.id, returnTo: 'list' })
+    } else {
+      setView('list')
+    }
     setListKey((k) => k + 1)
   }
 

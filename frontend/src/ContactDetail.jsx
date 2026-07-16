@@ -3,6 +3,20 @@ import FollowUpList from './FollowUpList'
 import VoiceNotes from './VoiceNotes'
 import { apiFetch } from './api'
 
+// Amounts are stored as absolute PKR numbers; display them the way the
+// agent thinks — in Lakhs/Crores — rather than a long raw number.
+function trim(n) {
+  return Number(n.toFixed(2)).toString()
+}
+
+function formatAmount(n) {
+  if (n === null || n === undefined || n === '') return '—'
+  const num = Number(n)
+  if (num >= 1e7) return `${trim(num / 1e7)} Crore`
+  if (num >= 1e5) return `${trim(num / 1e5)} Lakh`
+  return num.toLocaleString()
+}
+
 function ContactDetail({ session, contactId, onEdit, onBack }) {
   const [contact, setContact] = useState(null)
   const [interactions, setInteractions] = useState([])
@@ -88,10 +102,10 @@ function ContactDetail({ session, contactId, onEdit, onBack }) {
         <p>Last interaction: {contact.last_interaction_date ? new Date(contact.last_interaction_date).toLocaleString() : 'Never'}</p>
       </section>
 
-      {(contact.type === 'buyer' || contact.type === 'lead') && (
+      {(contact.type === 'buyer' || contact.type === 'lead' || contact.type === 'tenant') && (
         <section>
           <h3>What they're looking for</h3>
-          <p>Budget: {details.budget ?? '—'}</p>
+          <p>Budget: {formatAmount(details.budget)}</p>
           <p>Beds wanted: {details.beds_wanted || '—'}</p>
           <p>Size wanted (sq. yd): {details.size_wanted_sqyd ?? '—'}</p>
           <p>Property type wanted: {details.property_type_wanted || '—'}</p>
@@ -103,7 +117,7 @@ function ContactDetail({ session, contactId, onEdit, onBack }) {
         <section>
           <h3>What they're offering</h3>
           <p>Property address: {details.property_address || '—'}</p>
-          <p>Asking price: {details.asking_price ?? '—'}</p>
+          <p>Asking price: {formatAmount(details.asking_price)}</p>
           <p>Beds: {details.beds || '—'}</p>
           <p>Size (sq. yd): {details.size_sqyd ?? '—'}</p>
           <p>Property type: {details.property_type || '—'}</p>

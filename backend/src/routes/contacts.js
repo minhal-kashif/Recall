@@ -87,7 +87,7 @@ router.get('/:id', async (req, res) => {
   if (!contact) return res.status(404).json({ error: 'Contact not found' });
 
   let details = null;
-  if (contact.type === 'buyer' || contact.type === 'lead') {
+  if (contact.type === 'buyer' || contact.type === 'lead' || contact.type === 'tenant') {
     const { data } = await db.from('buyer_details').select('*').eq('contact_id', contact.id).maybeSingle();
     details = data;
   } else if (contact.type === 'seller') {
@@ -176,7 +176,7 @@ router.patch('/:id', async (req, res) => {
   }
 
   let details = null;
-  if (buyerDetails && (newType === 'buyer' || newType === 'lead')) {
+  if (buyerDetails && (newType === 'buyer' || newType === 'lead' || newType === 'tenant')) {
     const { data, error } = await db
       .from('buyer_details')
       .upsert({ ...buyerDetails, contact_id: req.params.id }, { onConflict: 'contact_id' })

@@ -27,6 +27,66 @@ function nullsToEmptyStrings(obj) {
   return Object.fromEntries(Object.entries(obj).map(([key, value]) => [key, value === null ? '' : value]))
 }
 
+const UNIT_MULTIPLIERS = { exact: 1, lakh: 100000, crore: 10000000 }
+
+// Amounts (budget, asking price) are stored as absolute PKR numbers, but the
+// agent thinks in lakhs/crores. This lets them type in whichever unit is
+// convenient while the stored value stays absolute.
+function AmountInput({ value, onChange, label }) {
+  const initial = (() => {
+    if (value === '' || value === null || value === undefined) {
+      return { amount: '', unit: 'lakh' }
+    }
+    const num = Number(value)
+    const unit = num >= 1e7 ? 'crore' : num >= 1e5 ? 'lakh' : 'exact'
+    return { amount: String(num / UNIT_MULTIPLIERS[unit]), unit }
+  })()
+
+  const [amount, setAmount] = useState(initial.amount)
+  const [unit, setUnit] = useState(initial.unit)
+
+  const emit = (nextAmount, nextUnit) => {
+    if (nextAmount === '') {
+      onChange('')
+      return
+    }
+    const absolute = Number(nextAmount) * UNIT_MULTIPLIERS[nextUnit]
+    if (Number.isFinite(absolute) && absolute >= 0) {
+      onChange(absolute)
+    }
+  }
+
+  const handleAmountChange = (e) => {
+    const next = e.target.value
+    setAmount(next)
+    emit(next, unit)
+  }
+
+  const handleUnitChange = (e) => {
+    const next = e.target.value
+    setUnit(next)
+    emit(amount, next)
+  }
+
+  return (
+    <span>
+      <input
+        type="number"
+        step="any"
+        min="0"
+        aria-label={`${label} amount`}
+        value={amount}
+        onChange={handleAmountChange}
+      />
+      <select aria-label={`${label} unit`} value={unit} onChange={handleUnitChange}>
+        <option value="exact">Exact</option>
+        <option value="lakh">Lakh</option>
+        <option value="crore">Crore</option>
+      </select>
+    </span>
+  )
+}
+
 function ContactForm({ session, contactId, onSaved, onCancel }) {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -72,7 +132,7 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
     setError(null)
 
     const payload = { name, phone, type, notes }
-    if (type === 'buyer' || type === 'lead') {
+    if (type === 'buyer' || type === 'lead' || type === 'tenant') {
       payload.buyer_details = buyerDetails
     } else if (type === 'seller') {
       payload.seller_details = sellerDetails
@@ -112,6 +172,7 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
         <select value={type} onChange={(e) => setType(e.target.value)}>
           <option value="lead">Lead</option>
           <option value="buyer">Buyer</option>
+          <option value="tenant">Tenant</option>
           <option value="seller">Seller</option>
         </select>
       </label>
@@ -121,15 +182,15 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
       </label>
 
-      {(type === 'buyer' || type === 'lead') && (
+      {(type === 'buyer' || type === 'lead' || type === 'tenant') && (
         <fieldset>
           <legend>What they're looking for</legend>
           <label>
             Budget
-            <input
-              type="number"
+            <AmountInput
+              label="Budget"
               value={buyerDetails.budget}
-              onChange={(e) => setBuyerDetails({ ...buyerDetails, budget: e.target.value })}
+              onChange={(v) => setBuyerDetails({ ...buyerDetails, budget: v })}
             />
           </label>
           <label>
@@ -190,10 +251,10 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
           </label>
           <label>
             Asking price
-            <input
-              type="number"
+            <AmountInput
+              label="Asking price"
               value={sellerDetails.asking_price}
-              onChange={(e) => setSellerDetails({ ...sellerDetails, asking_price: e.target.value })}
+              onChange={(v) => setSellerDetails({ ...sellerDetails, asking_price: v })}
             />
           </label>
           <label>

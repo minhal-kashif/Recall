@@ -1,4 +1,4 @@
-const CONTACT_TYPES = ['buyer', 'seller', 'lead'];
+const CONTACT_TYPES = ['buyer', 'seller', 'lead', 'tenant'];
 const PROPERTY_TYPES = ['house', 'apartment'];
 
 const MAX_LENGTHS = {
@@ -136,7 +136,7 @@ function validateContactInput(body, { partial = false, existingType = null } = {
   let sellerDetails = null;
 
   const effectiveType = contact.type || body.type || existingType;
-  if (effectiveType === 'buyer' || effectiveType === 'lead') {
+  if (effectiveType === 'buyer' || effectiveType === 'lead' || effectiveType === 'tenant') {
     buyerDetails = validateBuyerDetails(body, errors);
   } else if (effectiveType === 'seller') {
     sellerDetails = validateSellerDetails(body, errors);

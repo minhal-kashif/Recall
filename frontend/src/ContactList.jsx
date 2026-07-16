@@ -58,6 +58,7 @@ function ContactList({ session, onSelect, onAdd }) {
           <option value="buyer">Buyer</option>
           <option value="seller">Seller</option>
           <option value="lead">Lead</option>
+          <option value="tenant">Tenant</option>
         </select>
         <select
           aria-label="Filter by property type"
