@@ -9,6 +9,7 @@ const contactsRouter = require('./routes/contacts');
 const interactionsRouter = require('./routes/interactions');
 const followUpsRouter = require('./routes/followUps');
 const pushSubscriptionsRouter = require('./routes/pushSubscriptions');
+const voiceNotesRouter = require('./routes/voiceNotes');
 
 const app = express();
 
@@ -49,6 +50,18 @@ app.use('/api/contacts', authLimiter, contactsRouter);
 app.use('/api/interactions', authLimiter, interactionsRouter);
 app.use('/api/follow-ups', authLimiter, followUpsRouter);
 app.use('/api/push-subscriptions', authLimiter, pushSubscriptionsRouter);
+
+// Tighter limiter specifically on voice-note uploads (cost/abuse control on
+// top of the per-file size cap) — applied only to the POST route below.
+const voiceUploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: rateLimitMessage,
+});
+app.post('/api/voice-notes', voiceUploadLimiter);
+app.use('/api/voice-notes', authLimiter, voiceNotesRouter);
 
 app.get('/api/health', async (req, res) => {
   const { error } = await supabase.from('_health_check_').select('*').limit(1);
