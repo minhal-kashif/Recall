@@ -22,7 +22,7 @@
 Stage 1 — Core Foundation. Stage 3 (voice/WhatsApp AI features) is deferred — do not build until explicitly told to.
 
 ## Conventions
-- Contact types: buyer, seller, lead (lowercase, exact strings)
-- Buyer/Lead fields live in buyer_details; Seller fields live in seller_details
+- Contact types: buyer, seller, lead, tenant (lowercase, exact strings)
+- Buyer/Lead/Tenant fields live in buyer_details ("what they're looking for"); Seller fields live in seller_details
 - Always update contacts.last_interaction_date when a new interaction is logged
 - Supabase project URL: https://gleuammjovnltispagmg.supabase.co
