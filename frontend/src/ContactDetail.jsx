@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import FollowUpList from './FollowUpList'
+import VoiceNotes from './VoiceNotes'
 import { apiFetch } from './api'
 
 function ContactDetail({ session, contactId, onEdit, onBack }) {
@@ -111,6 +112,15 @@ function ContactDetail({ session, contactId, onEdit, onBack }) {
       )}
 
       <FollowUpList session={session} contactId={contactId} />
+
+      <VoiceNotes
+        session={session}
+        contactId={contactId}
+        onUploaded={() => {
+          loadInteractions()
+          loadContact()
+        }}
+      />
 
       <section>
         <h3>Add a note</h3>
