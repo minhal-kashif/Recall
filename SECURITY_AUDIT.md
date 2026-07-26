@@ -331,6 +331,59 @@ Every claim above about RLS was tested live against the actual database, not inf
 
 All test rows were cleaned up after each test; no residual test data remains in the project.
 
+## Update 2026-07-17 — `DELETE /api/contacts/:id`
+
+The PRD lists contact deletion as Stage 1 scope; it had never been built. Added `router.delete('/:id', ...)` in `backend/src/routes/contacts.js`, using the same pattern already proven safe above: fetch through the user-scoped client (RLS-bound), `maybeSingle()` returning null on a foreign/nonexistent id → `404`, otherwise delete. No new ownership-check code path was introduced — it's the identical shape as the existing `PATCH` handler, so it inherits the same live-tested cross-tenant protection rather than needing a fresh impersonation test.
+
+DB-level cascade (`on delete cascade` from `20260714070000_stage1_core_schema.sql` / `20260716120000_stage3_voice_notes_schema.sql`) removes `buyer_details`/`seller_details`/`interactions`/`follow_ups`/`voice_notes` rows automatically. That cascade does **not** reach Supabase Storage — a deleted contact's voice-note *rows* would disappear while the actual audio *objects* stayed orphaned in the `voice-notes` bucket (unreachable, but still occupying storage). Fixed by reading the contact's `voice_notes.storage_path` list and calling `storage.from('voice-notes').remove(...)` before the DB delete.
+
+Verified live: created two test contacts (one with a Lakh-unit buyer budget, one with a Crore-unit seller asking price), deleted both through the UI, confirmed `204` responses and immediate list removal, then ran a direct SQL check for orphaned rows across `buyer_details`, `seller_details`, `interactions`, `follow_ups`, and `voice_notes` referencing a nonexistent `contact_id` — zero orphans in every table.
+
+## Update 2026-07-25 — re-audit of Listings, Activity, Saved Filters, rate-limit change, and the status/interests/log-a-call batch
+
+Scope: everything built since the T3 audit that had not yet been reviewed — `backend/src/routes/listings.js` + `validation/listings.js` (including the `status` field and `/interests` sub-routes added this session), the `listing-photos` Storage bucket, `backend/src/routes/activity.js`, `backend/src/routes/savedFilters.js` + `validation/savedFilters.js` (never audited at all), the `authLimiter` change from 20/min to 120/min, and the Log a Call modal (which turned out to add zero new backend surface — see below). Same methodology as every prior pass: reproduce against the live Supabase project, don't theorize.
+
+**No cross-tenant or key-exposure findings. Two new Low-severity robustness notes below. Everything else checked clean, including a full live IDOR test suite against every new table and the new Storage bucket.**
+
+### Full live IDOR test suite (reproduced, not assumed)
+Impersonated a fake attacker (`sub: 11111111-1111-1111-1111-111111111111`, a UUID with no real account) against the real user's real data, using `SET LOCAL role authenticated; SET LOCAL request.jwt.claims`, each inside a transaction rolled back afterward — same technique used for the T2.3/T3 audits' impersonation tests:
+
+| Test | Result |
+|---|---|
+| Attacker `SELECT` on `listings` | **0 rows visible** |
+| Attacker `UPDATE` on the real user's real listing (`property_address = 'HACKED'`) | **0 rows affected** |
+| Attacker `INSERT` into `listings` with their own `user_id` but `contact_id` pointing at the real user's real seller contact (tests the join-based ownership check, not just the direct `user_id` one) | **rejected**, `42501: new row violates row-level security policy for table "listings"` |
+| Attacker `SELECT` on `saved_filters` | **0 rows visible** |
+| Attacker `INSERT` into `saved_filters` claiming the real user's `user_id` (session-hijack style) | **rejected**, `42501` |
+| Attacker `INSERT` into `listing_interests` pointing `listing_id` at the real user's real listing | **rejected**, `42501: new row violates row-level security policy for table "listing_interests"` |
+| Attacker `SELECT` on `storage.objects` for `bucket_id = 'listing-photos'` | **0 objects visible** |
+| Attacker `INSERT` a storage object under the real user's own folder prefix (path hijack) | **rejected**, `42501: new row violates row-level security policy for table "objects"` |
+
+All eight ran inside their own transaction and were rolled back; no residual test data or state change from these tests remains.
+
+### Verified clean (live, not assumed)
+- **`listings` RLS** (`pg_policies`, re-queried live): single `FOR ALL` policy, `USING (user_id = auth.uid())`, `WITH CHECK (user_id = auth.uid() AND (contact_id IS NULL OR EXISTS(contact owned by auth.uid())))` — the M7 dual-ownership pattern, correctly requiring the linked seller contact (if any) belong to the same user. Matches the migration exactly; confirmed no drift between what was planned and what's actually deployed.
+- **`listing_interests` RLS**: `WITH CHECK` requires **both** the listing and the contact belong to `auth.uid()` — the strictest ownership pattern used anywhere in this codebase so far, and it held under the live test above.
+- **`saved_filters` RLS**: simple direct `user_id = auth.uid()` on both `USING` and `WITH CHECK` — correct, since unlike listings/interactions this table has no foreign entity to cross-check.
+- **`listing-photos` bucket is private** (`storage.buckets.public = false`, re-queried live), with the identical four folder-scoped policies (select/insert/update/delete) as the already-audited `voice-notes` bucket, gated on `(storage.foldername(name))[1] = auth.uid()::text`.
+- **Express-layer defense in depth**: `verifySellerLink()`/`verifyLeadOwnership()` in `listings.js` both query `contacts` through the user-scoped client (RLS-bound), so a foreign `contact_id` correctly resolves to "not found" rather than leaking whether it exists under another tenant — same pattern as `verifyContactOwnership()` elsewhere. Photo upload path is entirely server-built (`req.user.id` + verified `req.params.id` + `crypto.randomUUID()`); the listing's existence is re-checked via the user-scoped client before any storage write, so a foreign listing id 404s before touching Storage at all.
+- **Error handling (M1 pattern)**: grepped `listings.js`, `savedFilters.js`, `activity.js` for `.message` — zero raw-error passthroughs; every failure path routes through the shared `dbError()` helper.
+- **Rate limiting**: `listingsRouter`, `savedFiltersRouter`, and `activityRouter` are all mounted under the same shared `authLimiter` in `server.js` as every other router; the listing-photo upload POST additionally sits behind its own dedicated `listingPhotoUploadLimiter` (10/min), mirroring the already-audited voice-note upload pattern.
+- **The `authLimiter` 20→120/min change**: reviewed the change itself, not just its neighbors. It raises a per-IP ceiling, not a per-endpoint bypass — every route that was covered before is still covered now, at a higher number chosen to match real per-screen fan-out (documented in-line in `server.js`) rather than removed or defeated. 120/min still meaningfully bounds an invalid-token flood against Supabase's Auth API (H1's original concern) — it is not the unbounded value the user separately asked for and was talked out of.
+- **Log a Call modal introduces no new backend surface**: `LogCallModal.jsx` calls the already-audited `POST /api/interactions` and `POST /api/follow-ups` verbatim — same `verifyContactOwnership()` checks, same validation, same RLS. The only backend change in this area was widening `interactions.source`'s client-settable allowlist to `['manual', 'call', 'whatsapp']` (`validation/interactions.js`) — confirmed `'voice'` and any future `'whatsapp_import'` are deliberately excluded from what a client can self-report, so a user can't spoof an interaction as having come from the (not-yet-built) AI-parsed import path.
+- **Listing `status` field**: server-side allowlist (`LISTING_STATUSES = ['available', 'under_offer', 'sold', 'rented']`) in `validation/listings.js`, rejects anything else with a 400 — no free-text status, no injection surface.
+- **XSS**: grepped all of `frontend/src` (including every file added this session — `ListingCard.jsx`, `ListingDetail.jsx`, `RecentActivity.jsx`, `LogCallModal.jsx`, `ActivityTimeline.jsx`, etc.) for `dangerouslySetInnerHTML`, `innerHTML`, `eval(` — zero matches.
+- **Supply chain**: no new backend dependencies since the last audit; `npm audit --production` reports 0 vulnerabilities.
+- **Advisors**: `get_advisors(type: security)` returns exactly one warning — the pre-existing, already-documented M6. None of this session's schema (listings, listing_interests, saved_filters, the status column, the listing-photos bucket/policies) introduced a new advisory.
+
+### [L6] `GET /api/activity/recent?limit=` doesn't reject negative values
+- Severity: Low. `Math.min(Number(req.query.limit) || 8, 20)` — a negative number is truthy in JS, so `?limit=-5` passes through as `-5` into Supabase's `.limit()`. This doesn't leak data (the query is still RLS-scoped to the caller's own rows) and doesn't affect other tenants; worst case is a malformed request produces a PostgREST error, caught by the existing `dbError()` handler and returned as a generic 500 rather than any real content. Same class as the original L1 (no pagination bound) — a robustness gap, not a breach.
+- Fix (not applied — low priority, noted for later): clamp with `Math.max(1, Math.min(Number(req.query.limit) || 8, 20))`.
+
+### [L7] `GET /api/follow-ups/today?upcoming_days=` has no upper bound
+- Severity: Low. Validated to be finite and positive, but an extreme value (e.g. `upcoming_days=99999999999`) could push `Date.now() + lookahead * 86400000` past `Date`'s safe range, producing `Invalid Date` → an ISO-string call that throws, caught by the trailing error-handling middleware (`M2`'s generic 500, not a stack trace). Not exploitable for data exposure — still fully RLS-scoped to the caller's own `follow_ups` — just an unbounded-input robustness gap, same class as L6.
+- Fix (not applied — low priority, noted for later): cap `lookahead` at a sane maximum (e.g. 3650, which the Follow-ups page itself already uses as its "everything" window).
+
 ## Attacker's shortest path to my data
 
 There is currently no direct path to a cross-tenant data breach — RLS held under every IDOR/anon test above, no secrets are exposed in the repo or its git history, and the API never trusts a client-supplied `user_id`. The realistic shortest paths today are different in kind: (1) **availability/cost**, not confidentiality — flood `/api/me` or `/api/contacts` with no rate limiting (H1) to force unlimited real calls to Supabase's Auth API, a trivial no-login-required DoS/denial-of-wallet; (2) **XSS-then-takeover** — there is zero CSP anywhere (H2) and the session token sits in `localStorage` by Supabase's default (L3), so the day any XSS bug lands in this codebase — and Stage 3's planned WhatsApp-text and voice-transcript rendering is exactly the kind of attacker-controlled content that tends to introduce one — it becomes an instant, fully-mitigated-by-nothing account takeover. Fix H1 and H2 before Stage 3 begins; they're cheap now and become load-bearing the moment untrusted content enters the app.

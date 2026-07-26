@@ -102,10 +102,11 @@ A personal CRM where the agent never has to sit down and manually fill out forms
 
 ## 6. Out of Scope (v1)
 
-- Property listing management (this is a client-relationship tool, not a listings portal)
 - Multi-agent/team features (Stage 5 only)
 - Native iOS/Android apps (PWA only, for now)
 - Payment/invoicing features
+
+**Revised 2026-07-19:** Property listing management was originally out of scope ("this is a client-relationship tool, not a listings portal") but was added as a lightweight inventory feature — a single-photo listing record, optionally linked to a seller contact, surfaced in its own section and as a Featured strip on Home. Not a full listings portal (no MLS sync, no public-facing pages, no multi-photo galleries yet).
 
 ---
 

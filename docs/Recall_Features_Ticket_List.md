@@ -1,7 +1,7 @@
 # Recall — Features Ticket List
 
 **Status:** Draft v1
-**Last updated:** 14 July 2026
+**Last updated:** 26 July 2026 — T4.6 updated for the nav restructure (Contacts tab added, center Add removed) and the plot/land property type + Listings row-card layout
 **Companion docs:** Recall_PRD.md, Recall_Technical_Architecture.md, Recall_Security_Access.md
 
 Each ticket is meant to be handed to Claude Code roughly as-is, one at a time, in order. Acceptance criteria define "done." Dependencies show what must exist first.
@@ -120,11 +120,106 @@ Each ticket is meant to be handed to Claude Code roughly as-is, one at a time, i
 
 ---
 
-## STAGE 3+ (deferred — do not start until father confirms + AI costs approved)
+## STAGE 3 — Voice Notes (built; transcription still deferred)
 
-- Voice note recording + Whisper transcription
+### T3.1 — `voice_notes` schema + private storage
+**Description:** Create the `voice_notes` table and a private Supabase Storage bucket for recorded audio, with the same M7 dual-ownership RLS pattern used for `interactions`/`follow_ups`.
+**Acceptance criteria:**
+- `voice_notes` table with `contact_id`, `user_id`, `storage_path`, `duration_seconds`, `transcript_text` (nullable, unused for now)
+- Bucket is private, four folder-scoped storage policies (select/insert/update/delete), path convention `<user_id>/<contact_id>/<uuid>.<ext>`
+- RLS live-tested: cross-tenant read/write both rejected
+**Dependencies:** T1.6
+**Status:** Done — see SECURITY_AUDIT.md "T3 voice notes / storage surface"
+
+---
+
+### T3.2 — Voice note backend (upload → store → interaction)
+**Description:** `POST /api/voice-notes` accepts a multipart audio file, stores it, and creates a matching `interactions` row (`source: 'voice'`) so it appears in the normal timeline.
+**Acceptance criteria:**
+- 10 MB file-size cap, MIME allowlist, dedicated 10/min rate limiter on top of the shared `authLimiter`
+- Oversized upload returns `413`, not a generic `500`
+- `GET /api/voice-notes/:contactId` returns short-lived (1h) signed playback URLs, generated per request, never stored
+**Dependencies:** T3.1
+
+---
+
+### T3.3 — Voice note frontend (record / upload / playback)
+**Description:** In-browser recording via `MediaRecorder`, upload progress, and playback via a native `<audio>` element.
+**Acceptance criteria:**
+- Record, stop, preview, and upload a note from a contact's detail screen
+- Mic tracks stopped and object URLs revoked on stop/unmount
+- Playback works on a real device (not just desktop dev tools)
+**Dependencies:** T3.2
+
+---
+
+### T3.4 / T3.5 — Live verification + security review
+**Description:** End-to-end device test plus a full security pass on the new voice/storage surface.
+**Status:** Done — see SECURITY_AUDIT.md, two Low findings (L4 fixed, L5 documented/accepted).
+
+---
+
+## STAGE 4 — Post-launch additions (built, beyond original v1 scope)
+
+Requested directly once Stage 1–2 were live and in real use. See Recall_Technical_Architecture.md §8 for the full list; PRD §6 originally scoped listings out of v1 — reversed once asked for.
+
+### T4.1 — Property listings (inventory, independent of contacts)
+**Description:** A `listings` table + CRUD API + Listings/ListingDetail/ListingForm screens, so the agent can track property inventory that isn't necessarily tied to a seller contact yet.
+**Acceptance criteria:**
+- Create/edit a listing: address, asking price, beds, size, property type, condition notes, one cover photo, optional link to an existing seller contact
+- `status` field (available / under_offer / sold / rented), shown as a badge everywhere the listing appears
+- "Featured" listings show in a strip on the Home screen
+**Status:** Done — RLS and IDOR live-tested, see SECURITY_AUDIT.md 2026-07-25 update.
+
+---
+
+### T4.2 — Lead interest tracking per listing
+**Description:** Track which leads/buyers/tenants are interested in a given listing.
+**Acceptance criteria:**
+- `listing_interests` join table, a contact can only be marked interested once per listing
+- Listing detail shows an "Interested leads" list with add/remove
+- Interest count shown on the listing card everywhere it appears (Listings page, Home Featured strip)
+**Dependencies:** T4.1
+**Status:** Done.
+
+---
+
+### T4.3 — Dedicated Follow-ups page + cross-contact Activity feed
+**Description:** A full "every pending follow-up" list (the Home screen only ever showed a windowed slice), plus a merged activity feed across all contacts for the Home screen.
+**Acceptance criteria:**
+- Follow-ups page sorted soonest-due-first, no windowing
+- Activity feed merges manual/call/whatsapp interactions, done follow-ups, overdue follow-ups, and voice notes into one chronological list
+**Status:** Done.
+
+---
+
+### T4.4 — "Log a call" quick-entry flow
+**Description:** A simplified outcome-picklist modal (inspired by Salesforce/Follow Up Boss, cut down to what a solo agent actually needs) that logs a call interaction and optionally schedules a follow-up in one step.
+**Acceptance criteria:**
+- 6-option outcome picklist + optional notes
+- Optional "schedule a follow-up" toggle reveals description + due date/time fields inline
+- Reuses the existing `POST /api/interactions` and `POST /api/follow-ups` routes — no new backend surface
+**Status:** Done — live-verified end to end (interaction + follow-up both created correctly, ContactDetail refreshes to show both).
+
+---
+
+### T4.5 — Saved filters, `tenant` contact type, Lakh/Crore units, contact source, `plot` property type
+**Description:** A grab-bag of smaller additions requested alongside the above: named reusable contact-list filter presets (`saved_filters` table); a fourth contact type, `tenant`, sharing the buyer/lead "what they're looking for" shape; Lakh/Crore-aware amount input for PKR figures; an optional `source` (whatsapp/call) field on contacts; and a third `property_type` option, `plot` (land), on both contacts and listings — selecting it hides the Beds field everywhere it appears, since a plot has no bedroom count.
+**Status:** Done.
+
+---
+
+### T4.6 — "Ledger registry" visual redesign + nav restructure
+**Description:** Full visual redesign of every screen (Home, Contacts, Listings, Follow-ups, Settings, all forms) in a ledger/registry aesthetic. Bottom nav went through two revisions after real-device testing: first a 5-icon nav (Home / Follow-ups / Add / Listings / Settings) replacing the original 3-icon one, then — once the searchable Contacts list turned out to have no direct nav entry, and the center Add button turned out to duplicate the "+ Add" already on every relevant page — revised again to Home / Contacts / Follow-ups / Listings / Settings, with no center Add button. The Home-header avatar now opens Settings directly on tap.
+**Status:** Done — live-verified page by page across light/dark, mobile viewport, and (nav/property-type changes) on a real device over the physical-device test session.
+
+---
+
+## STAGE 5+ (deferred — do not start until father confirms + AI costs approved)
+
+- Whisper transcription of already-recorded voice notes (`voice_notes.transcript_text`)
 - WhatsApp export → Web Share Target → AI-parsed notes
 - AI relationship brief + client temperature
-- Team/broker accounts (Stage 5)
+- Team/broker accounts
 
-*(Will be broken into tickets once Stage 1–2 are live and the deferred features are greenlit.)*
+*(Will be broken into tickets once these are greenlit. Each needs its own security review before it ships — prompt injection, LLM-output validation, and denial-of-wallet don't exist as attack surfaces yet because none of this code exists.)*
