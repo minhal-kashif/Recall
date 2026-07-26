@@ -1,28 +1,24 @@
 import { useEffect, useState } from 'react'
 import FollowUpList from './FollowUpList'
 import VoiceNotes from './VoiceNotes'
+import ActivityTimeline from './ActivityTimeline'
+import LogCallModal from './LogCallModal'
+import Chip from './Chip'
 import { apiFetch } from './api'
+import { telLink, whatsappLink } from './phoneLinks'
+import { startPendingLog } from './pendingLog'
+import { formatAmount } from './formatAmount'
+import './ContactDetail.css'
 
-// Amounts are stored as absolute PKR numbers; display them the way the
-// agent thinks — in Lakhs/Crores — rather than a long raw number.
-function trim(n) {
-  return Number(n.toFixed(2)).toString()
-}
-
-function formatAmount(n) {
-  if (n === null || n === undefined || n === '') return '—'
-  const num = Number(n)
-  if (num >= 1e7) return `${trim(num / 1e7)} Crore`
-  if (num >= 1e5) return `${trim(num / 1e5)} Lakh`
-  return num.toLocaleString()
-}
-
-function ContactDetail({ session, contactId, onEdit, onBack }) {
+function ContactDetail({ session, contactId, onEdit, onBack, onDeleted }) {
   const [contact, setContact] = useState(null)
-  const [interactions, setInteractions] = useState([])
   const [noteText, setNoteText] = useState('')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [activityRefreshKey, setActivityRefreshKey] = useState(0)
+  const [showLogCall, setShowLogCall] = useState(false)
 
   const token = session.access_token
 
@@ -38,21 +34,14 @@ function ContactDetail({ session, contactId, onEdit, onBack }) {
       })
   }
 
-  const loadInteractions = (signal) => {
-    apiFetch(`/api/interactions/${contactId}`, { token, signal })
-      .then(setInteractions)
-      .catch((err) => {
-        if (err.message !== 'cancelled') setError(err.message)
-      })
-  }
-
   useEffect(() => {
     const controller = new AbortController()
     loadContact(controller.signal)
-    loadInteractions(controller.signal)
     return () => controller.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contactId])
+
+  const refreshActivity = () => setActivityRefreshKey((k) => k + 1)
 
   const handleAddNote = async (event) => {
     event.preventDefault()
@@ -67,7 +56,7 @@ function ContactDetail({ session, contactId, onEdit, onBack }) {
         body: JSON.stringify({ contact_id: contactId, note_text: noteText }),
       })
       setNoteText('')
-      loadInteractions()
+      refreshActivity()
       loadContact() // last_interaction_date changed
       setSubmitting(false)
     } catch (err) {
@@ -76,68 +65,159 @@ function ContactDetail({ session, contactId, onEdit, onBack }) {
     }
   }
 
+  const handleDelete = async () => {
+    setDeleting(true)
+    setError(null)
+    try {
+      await apiFetch(`/api/contacts/${contactId}`, { token, method: 'DELETE' })
+      onDeleted()
+    } catch (err) {
+      setError(err.message)
+      setDeleting(false)
+      setConfirmingDelete(false)
+    }
+  }
+
   if (!contact) {
-    return error ? <p style={{ color: 'red' }}>{error}</p> : <p>Loading...</p>
+    return error ? <p style={{ color: 'var(--brick-text)' }}>{error}</p> : <p>Loading...</p>
   }
 
   const details = contact.details || {}
 
   return (
     <div>
-      <button type="button" onClick={onBack}>
-        ← Back
-      </button>
-      <button type="button" onClick={() => onEdit(contactId)}>
-        Edit
-      </button>
+      <div className="detail-nav">
+        <button type="button" onClick={onBack}>
+          ← Back
+        </button>
+        <button type="button" onClick={() => onEdit(contactId)}>
+          Edit
+        </button>
+        {confirmingDelete ? (
+          <span className="delete-confirm">
+            Delete {contact.name}?{' '}
+            <button type="button" onClick={handleDelete} disabled={deleting}>
+              {deleting ? 'Deleting...' : 'Confirm'}
+            </button>{' '}
+            <button type="button" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
+              Cancel
+            </button>
+          </span>
+        ) : (
+          <button type="button" onClick={() => setConfirmingDelete(true)}>
+            Delete
+          </button>
+        )}
+      </div>
 
-      <h2>{contact.name}</h2>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {error && <p style={{ color: 'var(--brick-text)' }}>{error}</p>}
 
-      <section>
-        <h3>Contact info</h3>
-        <p>Phone: {contact.phone}</p>
-        <p>Type: {contact.type}</p>
-        <p>Notes: {contact.notes || '—'}</p>
-        <p>Last interaction: {contact.last_interaction_date ? new Date(contact.last_interaction_date).toLocaleString() : 'Never'}</p>
-      </section>
+      <div className="nameplate">
+        <span className="nameplate-name">{contact.name}</span>
+        <div className="nameplate-meta">
+          <span className="nameplate-phone">{contact.phone}</span>
+          <Chip tone={contact.type}>{contact.type}</Chip>
+        </div>
+        <div className="nameplate-actions">
+          <a
+            className="contact-action contact-action-call"
+            href={telLink(contact.phone)}
+            onClick={() => startPendingLog({ contactId, contactName: contact.name, source: 'call' })}
+          >
+            Call
+          </a>
+          <a
+            className="contact-action contact-action-whatsapp"
+            href={whatsappLink(contact.phone)}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => startPendingLog({ contactId, contactName: contact.name, source: 'whatsapp' })}
+          >
+            WhatsApp
+          </a>
+          <button type="button" className="contact-action contact-action-log" onClick={() => setShowLogCall(true)}>
+            Log a call
+          </button>
+        </div>
+        <p className="nameplate-notes">{contact.notes || 'No notes yet.'}</p>
+        <p className="nameplate-last">
+          Last interaction:{' '}
+          {contact.last_interaction_date ? new Date(contact.last_interaction_date).toLocaleDateString() : 'Never'}
+        </p>
+        {contact.source && (
+          <p className="nameplate-last">Reached via: {contact.source === 'whatsapp' ? 'WhatsApp' : 'Call'}</p>
+        )}
+      </div>
 
       {(contact.type === 'buyer' || contact.type === 'lead' || contact.type === 'tenant') && (
         <section>
-          <h3>What they're looking for</h3>
-          <p>Budget: {formatAmount(details.budget)}</p>
-          <p>Beds wanted: {details.beds_wanted || '—'}</p>
-          <p>Size wanted (sq. yd): {details.size_wanted_sqyd ?? '—'}</p>
-          <p>Property type wanted: {details.property_type_wanted || '—'}</p>
-          <p>Area of interest: {details.area_of_interest || '—'}</p>
+          <p className="section-label">What they're looking for</p>
+          <div className="kv">
+            <span className="kv-label">Budget</span>
+            <span className="kv-value">{formatAmount(details.budget)}</span>
+          </div>
+          <div className="kv">
+            <span className="kv-label">Beds wanted</span>
+            <span className="kv-value">{details.beds_wanted || '—'}</span>
+          </div>
+          <div className="kv">
+            <span className="kv-label">Size wanted (sq. yd)</span>
+            <span className="kv-value">{details.size_wanted_sqyd ?? '—'}</span>
+          </div>
+          <div className="kv">
+            <span className="kv-label">Property type wanted</span>
+            <span className="kv-value">{details.property_type_wanted || '—'}</span>
+          </div>
+          <div className="kv">
+            <span className="kv-label">Area of interest</span>
+            <span className="kv-value">{details.area_of_interest || '—'}</span>
+          </div>
         </section>
       )}
 
       {contact.type === 'seller' && (
         <section>
-          <h3>What they're offering</h3>
-          <p>Property address: {details.property_address || '—'}</p>
-          <p>Asking price: {formatAmount(details.asking_price)}</p>
-          <p>Beds: {details.beds || '—'}</p>
-          <p>Size (sq. yd): {details.size_sqyd ?? '—'}</p>
-          <p>Property type: {details.property_type || '—'}</p>
-          <p>Condition notes: {details.condition_notes || '—'}</p>
+          <p className="section-label">What they're offering</p>
+          <div className="kv">
+            <span className="kv-label">Property address</span>
+            <span className="kv-value">{details.property_address || '—'}</span>
+          </div>
+          <div className="kv">
+            <span className="kv-label">Asking price</span>
+            <span className="kv-value">{formatAmount(details.asking_price)}</span>
+          </div>
+          <div className="kv">
+            <span className="kv-label">Beds</span>
+            <span className="kv-value">{details.beds || '—'}</span>
+          </div>
+          <div className="kv">
+            <span className="kv-label">Size (sq. yd)</span>
+            <span className="kv-value">{details.size_sqyd ?? '—'}</span>
+          </div>
+          <div className="kv">
+            <span className="kv-label">Property type</span>
+            <span className="kv-value">{details.property_type || '—'}</span>
+          </div>
+          <div className="kv">
+            <span className="kv-label">Condition notes</span>
+            <span className="kv-value">{details.condition_notes || '—'}</span>
+          </div>
         </section>
       )}
 
-      <FollowUpList session={session} contactId={contactId} />
+      <FollowUpList session={session} contactId={contactId} onChange={refreshActivity} />
 
       <VoiceNotes
         session={session}
         contactId={contactId}
         onUploaded={() => {
-          loadInteractions()
+          refreshActivity()
           loadContact()
         }}
       />
 
       <section>
-        <h3>Add a note</h3>
+        <p className="section-label">Add a note</p>
         <form onSubmit={handleAddNote}>
           <textarea
             aria-label="What was discussed?"
@@ -152,20 +232,20 @@ function ContactDetail({ session, contactId, onEdit, onBack }) {
         </form>
       </section>
 
-      <section>
-        <h3>Interaction history</h3>
-        {interactions.length === 0 ? (
-          <p>No interactions logged yet.</p>
-        ) : (
-          <ul>
-            {interactions.map((i) => (
-              <li key={i.id}>
-                <strong>{new Date(i.interaction_date).toLocaleString()}</strong> ({i.source}): {i.note_text}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <ActivityTimeline session={session} contactId={contactId} refreshKey={activityRefreshKey} />
+
+      {showLogCall && (
+        <LogCallModal
+          session={session}
+          contactId={contactId}
+          contactName={contact.name}
+          onClose={() => setShowLogCall(false)}
+          onLogged={() => {
+            refreshActivity()
+            loadContact()
+          }}
+        />
+      )}
     </div>
   )
 }

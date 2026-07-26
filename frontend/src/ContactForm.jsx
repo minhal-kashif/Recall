@@ -1,8 +1,22 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from './api'
+import { uploadVoiceNote } from './voiceNotesApi'
+import { useVoiceRecorder } from './useVoiceRecorder'
+import AmountInput from './AmountInput'
+import './ContactForm.css'
+
+function formatElapsed(seconds) {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
 
 const BEDS_OPTIONS = ['Studio', '1', '2', '3', '4+']
-const PROPERTY_TYPES = ['house', 'apartment']
+const PROPERTY_TYPES = [
+  { value: 'house', label: 'House' },
+  { value: 'apartment', label: 'Apartment' },
+  { value: 'plot', label: 'Plot / Land' },
+]
 
 const emptyBuyerDetails = {
   budget: '',
@@ -27,78 +41,24 @@ function nullsToEmptyStrings(obj) {
   return Object.fromEntries(Object.entries(obj).map(([key, value]) => [key, value === null ? '' : value]))
 }
 
-const UNIT_MULTIPLIERS = { exact: 1, lakh: 100000, crore: 10000000 }
-
-// Amounts (budget, asking price) are stored as absolute PKR numbers, but the
-// agent thinks in lakhs/crores. This lets them type in whichever unit is
-// convenient while the stored value stays absolute.
-function AmountInput({ value, onChange, label }) {
-  const initial = (() => {
-    if (value === '' || value === null || value === undefined) {
-      return { amount: '', unit: 'lakh' }
-    }
-    const num = Number(value)
-    const unit = num >= 1e7 ? 'crore' : num >= 1e5 ? 'lakh' : 'exact'
-    return { amount: String(num / UNIT_MULTIPLIERS[unit]), unit }
-  })()
-
-  const [amount, setAmount] = useState(initial.amount)
-  const [unit, setUnit] = useState(initial.unit)
-
-  const emit = (nextAmount, nextUnit) => {
-    if (nextAmount === '') {
-      onChange('')
-      return
-    }
-    const absolute = Number(nextAmount) * UNIT_MULTIPLIERS[nextUnit]
-    if (Number.isFinite(absolute) && absolute >= 0) {
-      onChange(absolute)
-    }
-  }
-
-  const handleAmountChange = (e) => {
-    const next = e.target.value
-    setAmount(next)
-    emit(next, unit)
-  }
-
-  const handleUnitChange = (e) => {
-    const next = e.target.value
-    setUnit(next)
-    emit(amount, next)
-  }
-
-  return (
-    <span>
-      <input
-        type="number"
-        step="any"
-        min="0"
-        aria-label={`${label} amount`}
-        value={amount}
-        onChange={handleAmountChange}
-      />
-      <select aria-label={`${label} unit`} value={unit} onChange={handleUnitChange}>
-        <option value="exact">Exact</option>
-        <option value="lakh">Lakh</option>
-        <option value="crore">Crore</option>
-      </select>
-    </span>
-  )
-}
+const FOLLOWUP_SEQUENCE_OFFSETS = [1, 3, 7, 14, 21, 30]
 
 function ContactForm({ session, contactId, onSaved, onCancel }) {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [type, setType] = useState('lead')
   const [notes, setNotes] = useState('')
+  const [source, setSource] = useState('')
   const [buyerDetails, setBuyerDetails] = useState(emptyBuyerDetails)
   const [sellerDetails, setSellerDetails] = useState(emptySellerDetails)
   const [loading, setLoading] = useState(Boolean(contactId))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  const [scheduleSequence, setScheduleSequence] = useState(false)
+  const [sequenceCount, setSequenceCount] = useState(3)
 
   const token = session.access_token
+  const recorder = useVoiceRecorder()
 
   useEffect(() => {
     if (!contactId) return
@@ -110,6 +70,7 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
         setPhone(data.phone || '')
         setType(data.type || 'lead')
         setNotes(data.notes || '')
+        setSource(data.source || '')
         if (data.type === 'seller') {
           setSellerDetails({ ...emptySellerDetails, ...nullsToEmptyStrings(data.details || {}) })
         } else {
@@ -131,7 +92,7 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
     setSubmitting(true)
     setError(null)
 
-    const payload = { name, phone, type, notes }
+    const payload = { name, phone, type, notes, source: source || null }
     if (type === 'buyer' || type === 'lead' || type === 'tenant') {
       payload.buyer_details = buyerDetails
     } else if (type === 'seller') {
@@ -143,7 +104,49 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
 
     try {
       const data = await apiFetch(url, { method, token, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-      onSaved(data)
+
+      // A voice note can only attach to a contact that already exists, so a
+      // note recorded while adding a new contact is held in memory until
+      // right after this create succeeds — same one-step feel, deferred
+      // under the hood. The contact itself is already saved at this point,
+      // so a failure here shouldn't block navigation — just warn.
+      const warnings = []
+      if (!contactId && recorder.preview) {
+        try {
+          await uploadVoiceNote({
+            contactId: data.id,
+            blob: recorder.preview.blob,
+            durationSeconds: recorder.preview.durationSeconds,
+            token,
+          })
+        } catch {
+          warnings.push('the voice note failed to attach — you can record it again from the contact page')
+        }
+      }
+
+      if (!contactId && scheduleSequence) {
+        const offsets = FOLLOWUP_SEQUENCE_OFFSETS.slice(0, sequenceCount)
+        try {
+          for (let i = 0; i < offsets.length; i += 1) {
+            const dueDate = new Date(Date.now() + offsets[i] * 24 * 60 * 60 * 1000)
+            // eslint-disable-next-line no-await-in-loop
+            await apiFetch('/api/follow-ups', {
+              method: 'POST',
+              token,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contact_id: data.id,
+                description: `Follow up #${i + 1}`,
+                due_date: dueDate.toISOString(),
+              }),
+            })
+          }
+        } catch {
+          warnings.push('the follow-up sequence only partly saved — check the contact’s follow-ups')
+        }
+      }
+
+      onSaved(data, warnings.length ? `Contact saved, but ${warnings.join('; and ')}.` : null)
     } catch (err) {
       setError(err.message)
       setSubmitting(false)
@@ -154,8 +157,8 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit}>
-      <h2>{contactId ? 'Edit Contact' : 'Add Contact'}</h2>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
+      <h2 className="registry-title form-title">{contactId ? 'Edit contact' : 'Add contact'}</h2>
+      {error && <p style={{ color: 'var(--brick-text)' }}>{error}</p>}
 
       <label>
         Name
@@ -178,9 +181,87 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
       </label>
 
       <label>
+        How did they reach you?
+        <select value={source} onChange={(e) => setSource(e.target.value)}>
+          <option value="">--</option>
+          <option value="call">Call</option>
+          <option value="whatsapp">WhatsApp</option>
+        </select>
+      </label>
+
+      <label>
         Notes
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
       </label>
+
+      {!contactId && (
+        <div className="voice-note-field">
+          <label className="sequence-toggle">
+            <input
+              type="checkbox"
+              checked={scheduleSequence}
+              onChange={(e) => setScheduleSequence(e.target.checked)}
+            />{' '}
+            Schedule a follow-up sequence
+          </label>
+          {scheduleSequence && (
+            <label>
+              Number of follow-ups
+              <select value={sequenceCount} onChange={(e) => setSequenceCount(Number(e.target.value))}>
+                {FOLLOWUP_SEQUENCE_OFFSETS.map((_, i) => (
+                  <option key={i} value={i + 1}>
+                    {i + 1}
+                  </option>
+                ))}
+              </select>
+              <p className="voice-note-hint">
+                Creates {sequenceCount} follow-up{sequenceCount === 1 ? '' : 's'} at day{' '}
+                {FOLLOWUP_SEQUENCE_OFFSETS.slice(0, sequenceCount).join(', ')} from today.
+              </p>
+            </label>
+          )}
+        </div>
+      )}
+
+      {!contactId && (
+        <div className="voice-note-field">
+          <p className="section-label">Voice note (optional)</p>
+          {recorder.error && <p style={{ color: 'var(--brick-text)' }}>{recorder.error}</p>}
+
+          {!recorder.mediaRecorderSupported && !recorder.preview && (
+            <p>Voice recording is not supported on this device/browser.</p>
+          )}
+
+          {recorder.mediaRecorderSupported && !recorder.recording && !recorder.preview && (
+            <button type="button" onClick={recorder.startRecording}>
+              Record voice note
+            </button>
+          )}
+
+          {recorder.recording && (
+            <p className="recording-status">
+              Recording… {formatElapsed(recorder.elapsedSeconds)}{' '}
+              <button type="button" onClick={recorder.stopRecording}>
+                Stop
+              </button>
+            </p>
+          )}
+
+          {recorder.preview && (
+            <div className="voice-preview">
+              <audio controls src={recorder.preview.url}>
+                <track kind="captions" />
+              </audio>
+              <p className="voice-note-hint">Will be attached when you save this contact.</p>
+              <div className="voice-preview-actions">
+                <button type="button" onClick={recorder.discardPreview}>
+                  Discard
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {(type === 'buyer' || type === 'lead' || type === 'tenant') && (
         <fieldset>
@@ -193,20 +274,22 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
               onChange={(v) => setBuyerDetails({ ...buyerDetails, budget: v })}
             />
           </label>
-          <label>
-            Beds wanted
-            <select
-              value={buyerDetails.beds_wanted}
-              onChange={(e) => setBuyerDetails({ ...buyerDetails, beds_wanted: e.target.value })}
-            >
-              <option value="">--</option>
-              {BEDS_OPTIONS.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
-          </label>
+          {buyerDetails.property_type_wanted !== 'plot' && (
+            <label>
+              Beds wanted
+              <select
+                value={buyerDetails.beds_wanted}
+                onChange={(e) => setBuyerDetails({ ...buyerDetails, beds_wanted: e.target.value })}
+              >
+                <option value="">--</option>
+                {BEDS_OPTIONS.map((b) => (
+                  <option key={b} value={b}>
+                    {b}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label>
             Size wanted (sq. yd)
             <input
@@ -219,12 +302,18 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
             Property type wanted
             <select
               value={buyerDetails.property_type_wanted}
-              onChange={(e) => setBuyerDetails({ ...buyerDetails, property_type_wanted: e.target.value })}
+              onChange={(e) =>
+                setBuyerDetails({
+                  ...buyerDetails,
+                  property_type_wanted: e.target.value,
+                  beds_wanted: e.target.value === 'plot' ? '' : buyerDetails.beds_wanted,
+                })
+              }
             >
               <option value="">--</option>
               {PROPERTY_TYPES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
+                <option key={p.value} value={p.value}>
+                  {p.label}
                 </option>
               ))}
             </select>
@@ -257,13 +346,15 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
               onChange={(v) => setSellerDetails({ ...sellerDetails, asking_price: v })}
             />
           </label>
-          <label>
-            Beds
-            <input
-              value={sellerDetails.beds}
-              onChange={(e) => setSellerDetails({ ...sellerDetails, beds: e.target.value })}
-            />
-          </label>
+          {sellerDetails.property_type !== 'plot' && (
+            <label>
+              Beds
+              <input
+                value={sellerDetails.beds}
+                onChange={(e) => setSellerDetails({ ...sellerDetails, beds: e.target.value })}
+              />
+            </label>
+          )}
           <label>
             Size (sq. yd)
             <input
@@ -276,12 +367,18 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
             Property type
             <select
               value={sellerDetails.property_type}
-              onChange={(e) => setSellerDetails({ ...sellerDetails, property_type: e.target.value })}
+              onChange={(e) =>
+                setSellerDetails({
+                  ...sellerDetails,
+                  property_type: e.target.value,
+                  beds: e.target.value === 'plot' ? '' : sellerDetails.beds,
+                })
+              }
             >
               <option value="">--</option>
               {PROPERTY_TYPES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
+                <option key={p.value} value={p.value}>
+                  {p.label}
                 </option>
               ))}
             </select>
@@ -296,14 +393,15 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
         </fieldset>
       )}
 
-      <div>
-        <button type="submit" disabled={submitting}>
+      <div className="form-actions">
+        <button type="submit" disabled={submitting || recorder.recording}>
           {submitting ? 'Saving...' : 'Save'}
         </button>
         <button type="button" onClick={onCancel} disabled={submitting}>
           Cancel
         </button>
       </div>
+      {recorder.recording && <p className="field-warning">Stop the recording before saving.</p>}
     </form>
   )
 }
