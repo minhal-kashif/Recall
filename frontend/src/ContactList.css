@@ -1,0 +1,159 @@
+.list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.list-header h2 {
+  margin: 0;
+}
+
+.registry-search-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.registry-search-row .list-search {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.registry-filters {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.smart-list-pills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin-bottom: 12px;
+  padding-bottom: 2px;
+}
+.smart-list-pill {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  border-radius: 999px;
+  border: 1.5px solid var(--brass-fill);
+  overflow: hidden;
+}
+.smart-list-pill button {
+  border: none;
+  border-radius: 0;
+  min-height: unset;
+  background: var(--brass-tint);
+  color: var(--brass-text);
+}
+.smart-list-pill button:first-child {
+  padding: 7px 10px 7px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.smart-list-remove {
+  padding: 7px 10px !important;
+  font-size: 13px;
+  border-left: 1px solid var(--brass-fill) !important;
+}
+
+.list-search {
+  width: 100%;
+  margin-bottom: 10px;
+}
+.list-filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.list-filters select {
+  flex: 1;
+}
+.list-area-input {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.save-search-row {
+  margin: 4px 0 10px;
+}
+.save-search-toggle {
+  font-size: 12px;
+  padding: 6px 12px;
+  min-height: 32px;
+  color: var(--brass-text);
+  border-color: var(--brass-fill);
+}
+.save-search-form {
+  display: flex;
+  gap: 6px;
+}
+.save-search-form input {
+  flex: 1;
+}
+.save-search-form button {
+  font-size: 12px;
+  padding: 6px 12px;
+  min-height: 36px;
+  white-space: nowrap;
+}
+
+.registry-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.registry-card:hover {
+  border-color: var(--border-strong);
+}
+.registry-card-open {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 14px;
+  cursor: pointer;
+}
+.registry-card-open:focus-visible {
+  outline: 2px solid var(--emerald);
+  outline-offset: -2px;
+}
+.registry-card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.registry-card-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+}
+.registry-card-meta {
+  display: block;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-top: 3px;
+  text-transform: capitalize;
+}
+.registry-card-bottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 14px;
+}
+.registry-card-actions {
+  display: flex;
+  gap: 6px;
+}
+.registry-action {
+  width: 34px;
+  height: 34px;
+  text-decoration: none;
+  color: var(--ink-soft);
+}
+.registry-card-bottom .stat-pair {
+  align-items: flex-end;
+  text-align: right;
+}

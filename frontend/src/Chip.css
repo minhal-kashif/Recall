@@ -1,0 +1,65 @@
+.chip {
+  display: inline-block;
+  font-family: var(--font-sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.chip-buyer {
+  background: var(--emerald-tint);
+  color: var(--emerald-text);
+}
+.chip-seller {
+  background: var(--brass-tint);
+  color: var(--brass-text);
+}
+.chip-lead {
+  background: var(--slate-tint);
+  color: var(--slate-text);
+}
+.chip-tenant {
+  background: var(--rose-tint);
+  color: var(--rose-text);
+}
+.chip-overdue {
+  background: var(--brick-tint);
+  color: var(--brick-text);
+}
+.chip-today,
+.chip-upcoming,
+.chip-pending {
+  border: 1px solid var(--border-strong);
+  color: var(--ink-soft);
+  text-transform: none;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.chip-done {
+  background: var(--emerald-tint);
+  color: var(--emerald-text);
+}
+.chip-snoozed {
+  background: var(--brass-tint);
+  color: var(--brass-text);
+}
+.chip-available {
+  background: var(--emerald-tint);
+  color: var(--emerald-text);
+}
+.chip-under_offer {
+  background: var(--brass-tint);
+  color: var(--brass-text);
+}
+.chip-sold {
+  background: var(--slate-tint);
+  color: var(--slate-text);
+}
+.chip-rented {
+  background: var(--rose-tint);
+  color: var(--rose-text);
+}

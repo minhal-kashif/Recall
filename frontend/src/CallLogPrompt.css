@@ -1,0 +1,29 @@
+.log-prompt-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(36, 31, 25, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 50;
+  padding: 0;
+}
+.log-prompt {
+  background: var(--paper);
+  border-top: 1px solid var(--border-strong);
+  border-radius: 16px 16px 0 0;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  width: 100%;
+  max-width: 480px;
+}
+.log-prompt-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+.log-prompt-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}

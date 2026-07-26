@@ -1,0 +1,64 @@
+.login-screen {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 28px;
+  gap: 0;
+}
+.tab-strip {
+  display: flex;
+  width: 64px;
+  height: 5px;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 28px;
+}
+.tab-strip span {
+  flex: 1;
+}
+.tab-strip .buyer {
+  background: var(--emerald);
+}
+.tab-strip .seller {
+  background: var(--brass-fill);
+}
+.tab-strip .lead {
+  background: var(--slate);
+}
+.tab-strip .tenant {
+  background: var(--rose);
+}
+.login-wordmark {
+  font-size: 34px;
+  color: var(--emerald);
+  margin: 0;
+}
+.login-tagline {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink-soft);
+  margin: 8px 0 6px;
+}
+.login-sub {
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+  margin: 0 0 32px;
+  max-width: 240px;
+}
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 260px;
+}
+.login-footnote {
+  font-size: 11px;
+  color: var(--ink-faint);
+  margin-top: 16px;
+  max-width: 240px;
+  line-height: 1.5;
+}

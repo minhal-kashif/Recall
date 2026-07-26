@@ -1,0 +1,335 @@
+.home-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.home-eyebrow {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brick-text);
+}
+.home-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 24px;
+  margin: 4px 0 0;
+}
+.home-avatar-btn {
+  flex: none;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 10px;
+  min-height: unset;
+  cursor: pointer;
+}
+.home-avatar-btn:focus-visible {
+  outline: 2px solid var(--emerald);
+  outline-offset: 2px;
+}
+.home-avatar {
+  display: block;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex: none;
+  border: 1px solid var(--border);
+}
+
+.quick-actions-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.quick-actions-row .ledger-btn-outline {
+  flex: 1;
+}
+
+.performance-section {
+  margin-bottom: 8px;
+}
+.trend-widgets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.trend-widget {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+.trend-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 36px;
+  margin: 8px 0 6px;
+}
+.trend-bar {
+  flex: 1;
+  background: var(--border-strong);
+  border-radius: 2px 2px 0 0;
+  min-height: 3px;
+}
+.trend-bar-accent {
+  background: var(--emerald);
+}
+
+.recent-activity {
+  margin-bottom: 8px;
+}
+
+.view-ledger-btn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.featured-section {
+  margin-bottom: 8px;
+}
+.featured-strip {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 2px 2px 10px;
+  margin: 0 -16px 4px;
+  padding-left: 16px;
+  padding-right: 16px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.featured-strip::-webkit-scrollbar {
+  display: none;
+}
+.featured-strip li {
+  display: flex;
+  scroll-snap-align: start;
+}
+
+/* Compact variant for the Home strip — the full-size card (used on the
+   Listings page) is too large for a horizontal-scroll preview row. */
+.featured-strip .listing-card {
+  width: 168px;
+}
+.featured-strip .listing-body {
+  padding: 8px 10px 10px;
+  gap: 4px;
+}
+.featured-strip .listing-address {
+  font-size: 13px;
+}
+.featured-strip .listing-price {
+  font-size: 12.5px;
+}
+.featured-strip .listing-owner {
+  font-size: 10px;
+}
+.featured-strip .listing-stats {
+  gap: 4px;
+}
+.featured-strip .listing-stat {
+  padding: 3px 6px;
+  font-size: 9.5px;
+}
+.featured-strip .listing-footer-row {
+  margin-top: 6px;
+  padding-top: 6px;
+}
+.featured-strip .listing-share-btn {
+  padding: 5px 10px;
+  font-size: 11px;
+}
+.featured-strip .stat-pair-label {
+  font-size: 8.5px;
+}
+.featured-strip .stat-pair-value {
+  font-size: 12px;
+}
+.featured-strip .listing-footer-stats {
+  gap: 8px;
+}
+.featured-strip .chip {
+  font-size: 8.5px;
+  padding: 2px 6px;
+}
+
+/* Row-layout cards (photo left, details right) still sit side-by-side in
+   this horizontal-scroll strip — only the inside of each card changed from
+   photo-on-top, not the strip's own left-to-right arrangement. Needs more
+   width per card than the old stacked compact variant to fit both halves. */
+.featured-strip .listing-card--row {
+  width: 280px;
+}
+.featured-strip .listing-card--row .listing-photo {
+  width: 96px;
+}
+.featured-strip .listing-card--row .listing-stats {
+  display: none;
+}
+
+.stats-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.stat-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--page);
+}
+button.stat-cell {
+  min-height: unset;
+  font: inherit;
+  cursor: pointer;
+}
+.stat-cell-link:hover {
+  border-color: var(--border-strong);
+  background: var(--emerald-tint);
+}
+.stat-num {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+.stat-num-alert {
+  color: var(--brick-text);
+}
+.stat-label {
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+.attention-strip {
+  margin-bottom: 8px;
+}
+.attention-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  min-height: unset;
+}
+.attention-entry:hover {
+  background: var(--page);
+}
+.attention-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+}
+.attention-idle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--brick-text);
+  white-space: nowrap;
+}
+
+.empty-today {
+  padding-top: 4px;
+}
+.next-up-entry {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  min-height: unset;
+}
+.next-up-entry:hover {
+  background: var(--page);
+}
+.next-up-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brass-text);
+  margin-bottom: 4px;
+}
+
+.followup-section {
+  margin-bottom: 8px;
+}
+.followup-section .section-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brass-text);
+  margin: 18px 0 4px;
+}
+.followup-section:first-of-type .section-label {
+  margin-top: 4px;
+}
+
+.followup-entry {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 0;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  min-height: unset;
+}
+.followup-entry:first-of-type {
+  border-top: none;
+}
+.followup-entry:hover {
+  background: var(--page);
+}
+.entry-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.entry-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+}
+.entry-what {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 3px 0 6px;
+  line-height: 1.5;
+}
+.entry-when {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+}

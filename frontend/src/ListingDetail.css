@@ -1,0 +1,86 @@
+.listing-photo-full {
+  aspect-ratio: 16 / 10;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--page);
+  margin-bottom: 14px;
+}
+.listing-photo-full img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.listing-detail-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.add-interest-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.add-interest-form select {
+  flex: 1;
+}
+.add-interest-form button {
+  white-space: nowrap;
+}
+
+.interest-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.interest-row:first-of-type {
+  border-top: none;
+}
+.interest-name {
+  flex: 1;
+  text-align: left;
+  padding: 0;
+  border: none;
+  background: none;
+  min-height: unset;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--emerald-text);
+}
+.interest-name:hover {
+  background: none;
+  text-decoration: underline;
+}
+.interest-remove {
+  width: 28px;
+  height: 28px;
+  min-height: unset;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 15px;
+  color: var(--brick-text);
+}
+
+.listing-linked-contact {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 12px;
+  margin: 10px 0 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--emerald-tint);
+  color: var(--emerald-text);
+  font-size: 13px;
+  font-weight: 500;
+  min-height: unset;
+}
+.listing-linked-contact:hover {
+  border-color: var(--emerald);
+}

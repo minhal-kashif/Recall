@@ -1,0 +1,80 @@
+.tl-row {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.tl-row:first-of-type {
+  border-top: none;
+}
+.tl-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex: none;
+}
+.tl-dot-manual {
+  background: var(--slate);
+}
+.tl-dot-call {
+  background: var(--emerald);
+}
+.tl-dot-whatsapp {
+  background: #25d366;
+}
+.tl-dot-voice {
+  background: var(--rose);
+}
+.tl-dot-done {
+  background: var(--brass-fill);
+}
+.tl-dot-overdue {
+  background: var(--brick);
+}
+.tl-body {
+  flex: 1;
+  min-width: 0;
+}
+.activity-entry-body {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  min-height: unset;
+}
+.activity-entry-body:hover {
+  background: none;
+}
+.tl-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.tl-kind {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.tl-date {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.tl-text {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 2px 0 0;
+  line-height: 1.5;
+}
+.tl-audio {
+  width: 100%;
+  height: 32px;
+  margin-top: 6px;
+}

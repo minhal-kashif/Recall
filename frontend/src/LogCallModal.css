@@ -1,0 +1,12 @@
+.log-prompt form label {
+  margin-bottom: 10px;
+}
+.log-call-schedule-toggle {
+  margin: 10px 0;
+}
+.log-call-followup-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
