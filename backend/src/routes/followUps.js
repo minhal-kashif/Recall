@@ -11,13 +11,24 @@ router.use(requireAuth);
 
 // Must stay registered before GET /:contactId below — otherwise Express
 // would match "today" as a contactId value instead of routing here.
+//
+// Returns overdue/due-today follow-ups plus a look-ahead window (default 7
+// days) of upcoming ones — the frontend buckets these into Overdue / Today /
+// Upcoming by comparing due_date to now, same way it already computes the
+// overdue label. Kept as one endpoint/one bucketing source of truth instead
+// of splitting into separate "today" and "upcoming" calls.
 router.get('/today', async (req, res) => {
   const db = getUserClient(req.userToken);
+
+  const windowDays = Number(req.query.upcoming_days);
+  const lookahead = Number.isFinite(windowDays) && windowDays > 0 ? windowDays : 7;
+  const upperBound = new Date(Date.now() + lookahead * 24 * 60 * 60 * 1000).toISOString();
+
   const { data, error } = await db
     .from('follow_ups')
     .select('id, description, due_date, status, contact_id, contacts(name)')
     .eq('status', 'pending')
-    .lte('due_date', new Date().toISOString())
+    .lte('due_date', upperBound)
     .order('due_date', { ascending: true });
 
   if (error) return dbError(res, 'follow_ups:today', error);

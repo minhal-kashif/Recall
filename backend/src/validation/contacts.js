@@ -1,5 +1,6 @@
 const CONTACT_TYPES = ['buyer', 'seller', 'lead', 'tenant'];
-const PROPERTY_TYPES = ['house', 'apartment'];
+const PROPERTY_TYPES = ['house', 'apartment', 'plot'];
+const CONTACT_SOURCES = ['whatsapp', 'call'];
 
 const MAX_LENGTHS = {
   name: 255,
@@ -132,6 +133,16 @@ function validateContactInput(body, { partial = false, existingType = null } = {
     if (contact.notes) checkMaxLength(contact.notes, 'notes', errors);
   }
 
+  if (body.source !== undefined) {
+    if (body.source === '' || body.source === null) {
+      contact.source = null;
+    } else if (!CONTACT_SOURCES.includes(body.source)) {
+      errors.push(`source must be one of: ${CONTACT_SOURCES.join(', ')}`);
+    } else {
+      contact.source = body.source;
+    }
+  }
+
   let buyerDetails = null;
   let sellerDetails = null;
 
@@ -145,4 +156,4 @@ function validateContactInput(body, { partial = false, existingType = null } = {
   return { errors, contact, buyerDetails, sellerDetails };
 }
 
-module.exports = { validateContactInput, CONTACT_TYPES, PROPERTY_TYPES };
+module.exports = { validateContactInput, CONTACT_TYPES, PROPERTY_TYPES, CONTACT_SOURCES };

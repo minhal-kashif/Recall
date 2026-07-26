@@ -10,6 +10,9 @@ const interactionsRouter = require('./routes/interactions');
 const followUpsRouter = require('./routes/followUps');
 const pushSubscriptionsRouter = require('./routes/pushSubscriptions');
 const voiceNotesRouter = require('./routes/voiceNotes');
+const savedFiltersRouter = require('./routes/savedFilters');
+const listingsRouter = require('./routes/listings');
+const activityRouter = require('./routes/activity');
 
 const app = express();
 
@@ -37,10 +40,15 @@ const apiLimiter = rateLimit({
 app.use('/api', apiLimiter);
 
 // Tighter limiter in front of anything that calls requireAuth, so a flood of
-// invalid tokens can't force unlimited calls to Supabase's Auth API.
+// invalid tokens can't force unlimited calls to Supabase's Auth API. Shared
+// across every authenticated route group below, so the ceiling has to cover
+// a single screen's real fan-out, not just one request: Home alone fires ~5
+// parallel calls per load (follow-ups, contacts x2, listings, activity),
+// which React StrictMode doubles in dev — 20/min was tripping on completely
+// normal navigation, not actual abuse.
 const authLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 20,
+  limit: 120,
   standardHeaders: true,
   legacyHeaders: false,
   message: rateLimitMessage,
@@ -50,6 +58,8 @@ app.use('/api/contacts', authLimiter, contactsRouter);
 app.use('/api/interactions', authLimiter, interactionsRouter);
 app.use('/api/follow-ups', authLimiter, followUpsRouter);
 app.use('/api/push-subscriptions', authLimiter, pushSubscriptionsRouter);
+app.use('/api/saved-filters', authLimiter, savedFiltersRouter);
+app.use('/api/activity', authLimiter, activityRouter);
 
 // Tighter limiter specifically on voice-note uploads (cost/abuse control on
 // top of the per-file size cap) — applied only to the POST route below.
@@ -62,6 +72,18 @@ const voiceUploadLimiter = rateLimit({
 });
 app.post('/api/voice-notes', voiceUploadLimiter);
 app.use('/api/voice-notes', authLimiter, voiceNotesRouter);
+
+// Same cost/abuse control as voice-note uploads, applied only to the photo
+// upload route.
+const listingPhotoUploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: rateLimitMessage,
+});
+app.post('/api/listings/:id/photo', listingPhotoUploadLimiter);
+app.use('/api/listings', authLimiter, listingsRouter);
 
 app.get('/api/health', async (req, res) => {
   const { error } = await supabase.from('_health_check_').select('*').limit(1);

@@ -20,12 +20,14 @@ router.get('/', async (req, res) => {
   const db = getUserClient(req.userToken);
   const { data, error } = await db
     .from('contacts')
-    .select('id, name, phone, type, notes, last_interaction_date, created_at, buyer_details(*), seller_details(*)')
+    .select(
+      'id, name, phone, type, notes, source, last_interaction_date, created_at, buyer_details(*), seller_details(*)',
+    )
     .order('created_at', { ascending: false });
 
   if (error) return dbError(res, 'contacts:list', error);
 
-  const { q, type, property_type, area_of_interest } = req.query;
+  const { q, type, property_type, area_of_interest, stale_days } = req.query;
   let results = data;
 
   if (q) {
@@ -56,6 +58,17 @@ router.get('/', async (req, res) => {
     });
   }
 
+  // "Quiet N+ days" — same staleness definition the 15-day silence-reminder
+  // job uses: coalesce(last_interaction_date, created_at) older than N days.
+  const staleDaysNum = stale_days ? Number(stale_days) : null;
+  if (staleDaysNum && Number.isFinite(staleDaysNum) && staleDaysNum > 0) {
+    const cutoff = Date.now() - staleDaysNum * 24 * 60 * 60 * 1000;
+    results = results.filter((c) => {
+      const reference = c.last_interaction_date || c.created_at;
+      return new Date(reference).getTime() < cutoff;
+    });
+  }
+
   const shaped = results.map((c) => {
     const buyer = pickOne(c.buyer_details);
     const seller = pickOne(c.seller_details);
@@ -65,6 +78,7 @@ router.get('/', async (req, res) => {
       phone: c.phone,
       type: c.type,
       notes: c.notes,
+      source: c.source,
       last_interaction_date: c.last_interaction_date,
       created_at: c.created_at,
       property_type: buyer?.property_type_wanted || seller?.property_type || null,
@@ -195,6 +209,37 @@ router.patch('/:id', async (req, res) => {
   }
 
   res.json({ ...updatedContact, details });
+});
+
+router.delete('/:id', async (req, res) => {
+  const db = getUserClient(req.userToken);
+
+  const { data: existing, error: fetchError } = await db
+    .from('contacts')
+    .select('id')
+    .eq('id', req.params.id)
+    .maybeSingle();
+
+  if (fetchError) return dbError(res, 'contacts:delete:fetch', fetchError);
+  if (!existing) return res.status(404).json({ error: 'Contact not found' });
+
+  // Deleting the contacts row cascades buyer_details/seller_details/
+  // interactions/follow_ups/voice_notes at the DB level, but that only drops
+  // the voice_notes rows — the actual audio objects in Storage are separate
+  // and would be orphaned (unreachable, still billed) unless removed here.
+  const { data: notes } = await db
+    .from('voice_notes')
+    .select('storage_path')
+    .eq('contact_id', req.params.id);
+
+  if (notes && notes.length > 0) {
+    await db.storage.from('voice-notes').remove(notes.map((n) => n.storage_path));
+  }
+
+  const { error } = await db.from('contacts').delete().eq('id', req.params.id);
+  if (error) return dbError(res, 'contacts:delete', error);
+
+  res.status(204).send();
 });
 
 module.exports = router;
