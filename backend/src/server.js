@@ -108,6 +108,13 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`Backend listening on http://localhost:${PORT}`);
-});
+// Only bind a persistent listener for local/traditional hosting (npm start).
+// On Vercel, the platform imports `app` directly and handles the request
+// lifecycle itself — calling .listen() there would be a no-op at best.
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Backend listening on http://localhost:${PORT}`);
+  });
+}
+
+module.exports = app;
