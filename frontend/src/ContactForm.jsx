@@ -2,14 +2,10 @@ import { useEffect, useState } from 'react'
 import { apiFetch } from './api'
 import { uploadVoiceNote } from './voiceNotesApi'
 import { useVoiceRecorder } from './useVoiceRecorder'
+import VoiceRecorderControl from './VoiceRecorderControl'
 import AmountInput from './AmountInput'
 import './ContactForm.css'
-
-function formatElapsed(seconds) {
-  const m = Math.floor(seconds / 60)
-  const s = seconds % 60
-  return `${m}:${String(s).padStart(2, '0')}`
-}
+import './VoiceRecorderControl.css'
 
 const BEDS_OPTIONS = ['Studio', '1', '2', '3', '4+']
 const PROPERTY_TYPES = [
@@ -226,40 +222,7 @@ function ContactForm({ session, contactId, onSaved, onCancel }) {
       {!contactId && (
         <div className="voice-note-field">
           <p className="section-label">Voice note (optional)</p>
-          {recorder.error && <p style={{ color: 'var(--brick-text)' }}>{recorder.error}</p>}
-
-          {!recorder.mediaRecorderSupported && !recorder.preview && (
-            <p>Voice recording is not supported on this device/browser.</p>
-          )}
-
-          {recorder.mediaRecorderSupported && !recorder.recording && !recorder.preview && (
-            <button type="button" onClick={recorder.startRecording}>
-              Record voice note
-            </button>
-          )}
-
-          {recorder.recording && (
-            <p className="recording-status">
-              Recording… {formatElapsed(recorder.elapsedSeconds)}{' '}
-              <button type="button" onClick={recorder.stopRecording}>
-                Stop
-              </button>
-            </p>
-          )}
-
-          {recorder.preview && (
-            <div className="voice-preview">
-              <audio controls src={recorder.preview.url}>
-                <track kind="captions" />
-              </audio>
-              <p className="voice-note-hint">Will be attached when you save this contact.</p>
-              <div className="voice-preview-actions">
-                <button type="button" onClick={recorder.discardPreview}>
-                  Discard
-                </button>
-              </div>
-            </div>
-          )}
+          <VoiceRecorderControl recorder={recorder} hint="Will be attached when you save this contact." />
         </div>
       )}
 
