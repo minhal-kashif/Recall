@@ -6,6 +6,14 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim())
 })
 
+// Chrome's installability check (the thing that makes "Add to Home Screen"
+// produce a real standalone app instead of a bare bookmark shortcut)
+// requires the service worker to actually handle fetch — a trivial
+// passthrough is enough, no offline caching implemented here.
+self.addEventListener('fetch', (event) => {
+  event.respondWith(fetch(event.request))
+})
+
 self.addEventListener('push', (event) => {
   let payload = {}
   try {
@@ -17,6 +25,8 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'Recall'
   const options = {
     body: payload.body || '',
+    icon: '/icon-512.png',
+    badge: '/notification-badge.png',
     data: { contactId: payload.contactId || null },
   }
 
