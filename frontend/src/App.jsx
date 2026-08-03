@@ -20,9 +20,9 @@ function App() {
 
   if (loading) {
     return (
-      <section id="center">
+      <main id="center">
         <p>Loading...</p>
-      </section>
+      </main>
     )
   }
 
@@ -140,7 +140,7 @@ function Dashboard({ session, signOut }) {
   const navActive = navKeyFor(actualTopLevel)
 
   return (
-    <section id="center">
+    <main id="center">
       <div className="appbar">
         <button type="button" className="wordmark" onClick={() => setView('today')}>
           Recall
@@ -221,7 +221,7 @@ function Dashboard({ session, signOut }) {
         onListings={() => setView('listings')}
         onSettings={() => setView('settings')}
       />
-    </section>
+    </main>
   )
 }
 

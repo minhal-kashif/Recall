@@ -5,7 +5,7 @@ function Login() {
   const { signInWithGoogle } = useAuth()
 
   return (
-    <section id="center" className="login-screen">
+    <main id="center" className="login-screen">
       <div className="tab-strip">
         <span className="buyer"></span>
         <span className="seller"></span>
@@ -34,7 +34,7 @@ function Login() {
         Continue with Google
       </button>
       <p className="login-footnote">Google Sign-In only — no passwords to remember or reset.</p>
-    </section>
+    </main>
   )
 }
 
