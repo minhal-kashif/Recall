@@ -1,0 +1,17 @@
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'sha256-OwCdDqFm3pUvXzgOPhPhNLD3PnylU3npLafbSLpw8eQ='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://lh3.googleusercontent.com; media-src 'self' blob: https://gleuammjovnltispagmg.supabase.co; font-src 'self'; connect-src 'self' https://gleuammjovnltispagmg.supabase.co wss://gleuammjovnltispagmg.supabase.co https://recall-ai-digital-solutions.vercel.app; manifest-src 'self'; worker-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'"
+        },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" }
+      ]
+    }
+  ]
+}
