@@ -3,6 +3,7 @@ const requireAuth = require('../middleware/requireAuth');
 const { getUserClient } = require('../supabaseClient');
 const { validateContactInput } = require('../validation/contacts');
 const dbError = require('../utils/dbError');
+const { normalizePhone } = require('../utils/normalizePhone');
 
 const router = express.Router();
 
@@ -87,6 +88,100 @@ router.get('/', async (req, res) => {
   });
 
   res.json(shaped);
+});
+
+router.post('/import', async (req, res) => {
+  const { contacts } = req.body;
+
+  if (!Array.isArray(contacts)) {
+    return res.status(400).json({ error: 'contacts must be an array' });
+  }
+  if (contacts.length === 0) {
+    return res.status(400).json({ error: 'contacts must not be empty' });
+  }
+  if (contacts.length > 200) {
+    return res.status(400).json({ error: 'A maximum of 200 contacts can be imported at once' });
+  }
+
+  const db = getUserClient(req.userToken);
+
+  const { data: existing, error: existingError } = await db.from('contacts').select('id, phone');
+  if (existingError) return dbError(res, 'contacts:import:existing', existingError);
+
+  const existingKeys = new Set(
+    existing.map((c) => normalizePhone(c.phone)).filter((key) => key !== null),
+  );
+
+  let skippedInvalid = 0;
+  let skippedDuplicates = 0;
+  const seenKeys = new Set();
+  const rows = [];
+
+  for (const row of contacts) {
+    if (typeof row !== 'object' || row === null || Array.isArray(row)) {
+      skippedInvalid += 1;
+      continue;
+    }
+
+    const name = typeof row.name === 'string' ? row.name.trim() : '';
+    const phone = typeof row.phone === 'string' ? row.phone.trim() : '';
+
+    if (!name || !phone || name.length > 255 || phone.length > 50) {
+      skippedInvalid += 1;
+      continue;
+    }
+
+    const key = normalizePhone(phone);
+    if (key === null) {
+      skippedInvalid += 1;
+      continue;
+    }
+
+    if (existingKeys.has(key) || seenKeys.has(key)) {
+      skippedDuplicates += 1;
+      continue;
+    }
+
+    seenKeys.add(key);
+    rows.push({ user_id: req.user.id, name, phone, type: 'lead', notes: null, source: null });
+  }
+
+  if (rows.length === 0) {
+    return res.status(201).json({
+      imported: 0,
+      skipped_duplicates: skippedDuplicates,
+      skipped_invalid: skippedInvalid,
+      contacts: [],
+    });
+  }
+
+  const { data: inserted, error: insertError } = await db.from('contacts').insert(rows).select();
+  if (insertError) return dbError(res, 'contacts:import', insertError);
+
+  // Best-effort: the contacts themselves are already valid and usable, and
+  // GET /:id already tolerates a missing details row (it uses maybeSingle),
+  // so a failure here doesn't fail the request or roll anything back.
+  await db.from('buyer_details').insert(inserted.map((c) => ({ contact_id: c.id })));
+
+  const shapedContacts = inserted.map((c) => ({
+    id: c.id,
+    name: c.name,
+    phone: c.phone,
+    type: c.type,
+    notes: c.notes,
+    source: c.source,
+    last_interaction_date: c.last_interaction_date,
+    created_at: c.created_at,
+    property_type: null,
+    area_of_interest: null,
+  }));
+
+  res.status(201).json({
+    imported: inserted.length,
+    skipped_duplicates: skippedDuplicates,
+    skipped_invalid: skippedInvalid,
+    contacts: shapedContacts,
+  });
 });
 
 router.get('/:id', async (req, res) => {

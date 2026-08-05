@@ -54,6 +54,16 @@ const authLimiter = rateLimit({
   message: rateLimitMessage,
 });
 
+// Same cost/abuse control as voice-note/photo uploads, applied only to the
+// contact import route.
+const contactImportLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: rateLimitMessage,
+});
+app.post('/api/contacts/import', contactImportLimiter);
 app.use('/api/contacts', authLimiter, contactsRouter);
 app.use('/api/interactions', authLimiter, interactionsRouter);
 app.use('/api/follow-ups', authLimiter, followUpsRouter);

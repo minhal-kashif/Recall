@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { apiFetch } from './api'
 import { telLink, whatsappLink } from './phoneLinks'
 import { startPendingLog } from './pendingLog'
+import { isContactPickerSupported, pickContactsFromPhone } from './contactImport'
 import Chip from './Chip'
 import './ContactList.css'
 
@@ -51,10 +52,24 @@ function WhatsAppIcon() {
   )
 }
 
+function ImportIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M10 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm-7 18a7 7 0 0 1 7-7h1.17A5.98 5.98 0 0 0 11 16c0 1.5.56 2.87 1.48 3.9A9.96 9.96 0 0 0 3 20zm16-9v3h3v2h-3v3h-2v-3h-3v-2h3v-3z"
+      />
+    </svg>
+  )
+}
+
 function lastInteractionLabel(dateString) {
   if (!dateString) return 'Never'
   return new Date(dateString).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }
+
+// Capability doesn't change at runtime, so evaluating it once avoids recomputing on every render.
+const contactPickerSupported = isContactPickerSupported()
 
 function ContactList({ session, onSelect, onAdd }) {
   const [q, setQ] = useState('')
@@ -71,6 +86,10 @@ function ContactList({ session, onSelect, onAdd }) {
   const [showSaveInput, setShowSaveInput] = useState(false)
   const [saveName, setSaveName] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const token = session.access_token
 
@@ -115,7 +134,7 @@ function ContactList({ session, onSelect, onAdd }) {
       controller.abort()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, type, propertyType, areaOfInterest, staleDays])
+  }, [q, type, propertyType, areaOfInterest, staleDays, refreshKey])
 
   const hasActiveFilters = Boolean(q || type || propertyType || areaOfInterest || staleDays)
 
@@ -166,14 +185,81 @@ function ContactList({ session, onSelect, onAdd }) {
     }
   }
 
+  const handleImport = async () => {
+    if (importing) return
+    setImportResult(null)
+    let picked
+    try {
+      picked = await pickContactsFromPhone()
+    } catch {
+      setImportResult({ error: "Couldn't open your phone's contacts." })
+      return
+    }
+    if (picked.length === 0) return
+    if (picked.length > 200) {
+      setImportResult({ error: 'Please select 200 contacts or fewer at a time.' })
+      return
+    }
+    // A mis-tap in the native picker could otherwise inject hundreds of people silently
+    if (!window.confirm(`Add ${picked.length} contact${picked.length === 1 ? '' : 's'} as leads?`)) return
+    setImporting(true)
+    try {
+      const data = await apiFetch('/api/contacts/import', {
+        method: 'POST',
+        token,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contacts: picked }),
+        // apiFetch defaults to 10s, which is not enough headroom for a 200-row insert
+        timeoutMs: 30000,
+      })
+      setImportResult({
+        imported: data.imported,
+        skipped_duplicates: data.skipped_duplicates,
+        skipped_invalid: data.skipped_invalid,
+      })
+      setRefreshKey((k) => k + 1)
+    } catch (err) {
+      setImportResult({ error: err.message })
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  const importResultMessage = () => {
+    if (importResult.error) return importResult.error
+    const { imported, skipped_duplicates: dupes, skipped_invalid: invalid } = importResult
+    if (imported === 0 && !dupes && !invalid) return 'Nothing new to add.'
+    let msg = `Added ${imported} lead${imported === 1 ? '' : 's'}.`
+    if (dupes > 0) msg += ` ${dupes} already in Recall.`
+    if (invalid > 0) msg += ` ${invalid} had no name or number.`
+    return msg
+  }
+
   return (
     <div>
       <div className="list-header">
         <h2 className="registry-title">Leads Registry</h2>
-        <button type="button" className="icon-btn-square" onClick={onAdd} aria-label="Add contact">
-          <PlusIcon />
-        </button>
+        <div className="list-header-actions">
+          {contactPickerSupported && (
+            <button
+              type="button"
+              className="icon-btn-square"
+              onClick={handleImport}
+              disabled={importing}
+              aria-label="Import contacts from phone"
+            >
+              <ImportIcon />
+            </button>
+          )}
+          <button type="button" className="icon-btn-square" onClick={onAdd} aria-label="Add contact">
+            <PlusIcon />
+          </button>
+        </div>
       </div>
+
+      {importResult && (
+        <p className={`import-result${importResult.error ? ' error' : ''}`}>{importResultMessage()}</p>
+      )}
 
       <div className="registry-search-row">
         <input
